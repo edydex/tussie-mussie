@@ -599,7 +599,26 @@
       if (!scoringArea || !doneScoring) return;
       
       scoringArea.style.display = 'block';
-      doneScoring.disabled = playerData?.doneScoring || false;
+      // Check if the player has an unused marigold ability card
+      const allCards = [...(playerData.bouquet || []), ...(playerData.keepsakes || [])];
+      const hasUnusedMarigold = allCards.some(card => card.id === 'marigold' && !card.abilityUsed);
+      
+      // Disable the Done Scoring button if an unused marigold exists
+      doneScoring.disabled = hasUnusedMarigold || playerData?.doneScoring;
+      
+      // If there is an unused marigold, display a warning message
+      let warningElement = document.getElementById('marigoldWarning');
+      if (hasUnusedMarigold) {
+        if (!warningElement) {
+          warningElement = document.createElement('div');
+          warningElement.id = 'marigoldWarning';
+          warningElement.classList.add('ability-warning');
+          warningElement.innerHTML = '⚠️ You must use Marigold’s ability (discard one card) before finishing scoring.';
+          scoringArea.insertBefore(warningElement, doneScoring);
+        }
+      } else if (warningElement) {
+        warningElement.remove();
+      }
       
       // Add card ability UI if needed
       const abilityCardsContainer = document.getElementById('abilityCards');

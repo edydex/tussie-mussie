@@ -13,6 +13,8 @@ class Card {
     this.faceUp = false;
     this.location = null; // 'bouquet' or 'keepsakes'
     this.owner = null;
+    // NEW: Track if the card's ability has been used
+    this.abilityUsed = false;
   }
 
   flip() {
@@ -537,6 +539,9 @@ class Game {
     
     if (!card) return false;
     
+    // For marigold, do not allow re-use if already used
+    if (card.id === 'marigold' && card.abilityUsed) return false;
+    
     // Implement card abilities
     switch (card.id) {
       case 'pink-larkspur':
@@ -631,6 +636,8 @@ class Game {
           if (targetLocation) {
             // Remove the card
             player.removeCard(targetCardId, targetLocation);
+            // Mark marigold ability as used
+            card.abilityUsed = true;
             return true;
           }
         }
@@ -649,6 +656,11 @@ class Game {
   playerDoneScoring(playerId) {
     const player = this.players.find(p => p.id === playerId);
     if (player) {
+      // Check if player has any marigold card whose ability has not been used
+      const hasUnusedMarigold = [...player.bouquet, ...player.keepsakes].some(
+        card => card.id === 'marigold' && !card.abilityUsed
+      );
+      if (hasUnusedMarigold) return false;
       player.doneScoring = true;
       return true;
     }
