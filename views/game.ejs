@@ -123,6 +123,14 @@
       font-weight: bold;
       font-size: 1.2rem;
     }
+
+    /* Player score display */
+    .player-score-display {
+      margin-bottom: 1rem;
+      color: var(--primary-color);
+      font-weight: 600;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -175,6 +183,7 @@
           <!-- Player's Cards -->
           <div class="game-section">
             <h3>Your Cards</h3>
+            <div id="playerScoreDisplay" class="player-score-display"></div>
             <div class="player-cards-container">
               <div class="keepsakes-area"></div>
               <div id="playerCards" class="player-cards"></div>
@@ -200,7 +209,7 @@
       </div>
     </main>
   </div>
-
+  
   <script>
     // Simplified room joining mechanism - initialize socket first
     const socket = io();
@@ -228,7 +237,6 @@
     // Copy room link functionality
     document.getElementById('copyRoomLink').addEventListener('click', () => {
       const link = `${window.location.origin}/?join=${roomCode}`;
-      
       navigator.clipboard.writeText(link)
         .then(() => {
           alert('Room link copied to clipboard! When others open this link, they will be prompted to enter a nickname.');
@@ -417,8 +425,6 @@
       if (!activeCardsArea) return;
       
       console.log('Updating active cards:', activeCards);
-      
-      // Clear current cards
       activeCardsArea.innerHTML = '';
       
       if (!activeCards || activeCards.length === 0) {
@@ -432,7 +438,7 @@
         waitingMessage.classList.add('waiting-message');
         waitingMessage.textContent = 'Waiting for other player to choose a card to hide...';
         activeCardsArea.appendChild(waitingMessage);
-        return; // Don't show cards to receiving player during offering phase
+        return;
       }
       
       // Create and add card elements
@@ -498,7 +504,7 @@
           label.textContent = 'Keepsake';
           cardElement.appendChild(label);
         } else {
-          // Add bouquet label
+          // Add bouquet label for scoring phase
           const label = document.createElement('div');
           label.className = 'card-label';
           label.textContent = 'Bouquet';
@@ -519,6 +525,12 @@
         
         playerCards.appendChild(cardElement);
       });
+      
+      const playerScoreDisplay = document.getElementById('playerScoreDisplay');
+      if (playerScoreDisplay && playerData.score !== undefined) {
+        playerScoreDisplay.style.display = 'block';
+        playerScoreDisplay.textContent = `Score: ${playerData.score || 0}`;
+      }
     }
     
     function updateOpponentsCards(players) {
@@ -571,18 +583,14 @@
         
         allCards.forEach(card => {
           const cardElement = createCardElement(card, true);
-          
-          // Add class for keepsake cards
           if (card.type === 'keepsakes') {
             cardElement.classList.add('keepsake-card');
           }
-          
           cardsElement.appendChild(cardElement);
         });
         
         cardsContainer.appendChild(cardsElement);
         opponentElement.appendChild(cardsContainer);
-        
         opponentsArea.appendChild(opponentElement);
       });
     }
@@ -659,7 +667,6 @@
           <div class="result-player-name">${player.nickname}</div>
           <div class="result-player-score">${player.score} points</div>
         `;
-        
         resultsContainer.appendChild(playerResult);
       });
       
@@ -730,7 +737,6 @@
       }
       
       console.log('Creating card element for:', card, 'visible:', isVisible);
-      
       const cardElement = document.createElement('div');
       cardElement.classList.add('card');
       cardElement.dataset.cardId = card.id;
@@ -744,7 +750,6 @@
         mysteryContent.classList.add('card-mystery');
         mysteryContent.innerHTML = '<span>?</span>';
         cardElement.appendChild(mysteryContent);
-        
         return cardElement;
       }
       
@@ -770,7 +775,6 @@
           cardHearts.appendChild(heart);
         }
         cardHeader.appendChild(cardHearts);
-        
         cardElement.appendChild(cardHeader);
         
         // Card effect text
@@ -850,7 +854,6 @@
               });
               
               movesLeft--;
-              
               if (movesLeft <= 0) {
                 // Remove selection state
                 playerCards.forEach(c => c.classList.remove('selectable'));
@@ -889,7 +892,7 @@
     const timerValue = document.getElementById('timerValue');
     const TURN_TIME = 30; // seconds
     let timeRemaining = TURN_TIME;
-
+    
     function startTurnTimer() {
       // Clear any existing timer
       clearTurnTimer();
@@ -918,7 +921,7 @@
         }
       }, 1000);
     }
-
+    
     function clearTurnTimer() {
       if (timerInterval) {
         clearInterval(timerInterval);
@@ -926,7 +929,7 @@
       }
       turnTimer.classList.remove('visible');
     }
-
+    
     function updateTimerDisplay() {
       timerValue.textContent = `${timeRemaining}s`;
     }
