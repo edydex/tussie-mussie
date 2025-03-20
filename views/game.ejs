@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tussie Mussie - Game Room</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    /* Inline additional card layout styles */
+    .player-cards-container {
+      position: relative;
+      min-height: 230px;
+      padding: 1rem;
+      background-color: #f9f9f9;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+    }
+
+    .player-cards {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      position: relative;
+    }
+
+    .card.keepsake-card {
+      position: relative;
+      top: 30px; /* Shift keepsakes down */
+    }
+
+    .keepsakes-area {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 75px;
+      background-color: rgba(0, 0, 0, 0.03);
+      border-radius: 0 0 8px 8px;
+      z-index: 0;
+    }
+
+    .card-label {
+      position: absolute;
+      top: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.7rem;
+      background-color: #f0f0f0;
+      padding: 2px 6px;
+      border-radius: 10px;
+      border: 1px solid #ddd;
+      white-space: nowrap;
+    }
+
+    .opponent-cards-container {
+      position: relative;
+      min-height: 180px;
+      padding: 1rem;
+      background-color: #f9f9f9;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+    }
+
+    .opponent-cards {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      position: relative;
+    }
+
+    .opponent-card.keepsake-card {
+      top: 20px; /* Smaller shift for opponent cards */
+    }
+
+    .opponent .keepsakes-area {
+      height: 55px; /* Smaller area for opponent keepsakes */
+    }
+    
+    /* Turn Timer Styles */
+    .turn-timer {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background-color: rgba(255, 255, 255, 0.9);
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+      transition: all 0.3s ease;
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+
+    .turn-timer.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .turn-timer.urgent {
+      background-color: rgba(255, 235, 235, 0.95);
+    }
+
+    .timer-icon {
+      font-size: 1.5rem;
+    }
+
+    .timer-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .timer-label {
+      font-size: 0.8rem;
+      color: #666;
+    }
+
+    #timerValue {
+      font-weight: bold;
+      font-size: 1.2rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Tussie Mussie</h1>
+      <div class="room-info">
+        <div>Room Code: <span id="roomCodeDisplay"><%= roomCode %></span></div>
+        <button id="copyRoomLink" class="btn small-btn">Copy Room Link</button>
+      </div>
+    </header>
+    
+    <!-- Turn Timer -->
+    <div id="turnTimer" class="turn-timer">
+      <div class="timer-icon">⏱️</div>
+      <div class="timer-text">
+        <div class="timer-label">Time remaining:</div>
+        <div id="timerValue">30s</div>
+      </div>
+    </div>
+    
+    <main id="gamePage">
+      <!-- Waiting Area (Lobby) -->
+      <div id="waitingArea">
+        <h2>Game Lobby</h2>
+        <div class="lobby-container">
+          <div class="players-section">
+            <h3>Players</h3>
+            <div id="playersList" class="players-list"></div>
+          </div>
+          
+          <div class="lobby-controls">
+            <button id="startGameBtn" class="btn primary-btn" disabled>Start Game</button>
+            <p class="lobby-help">At least 2 players needed to start</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Game Area -->
+      <div id="gameArea" style="display: none;">
+        <div id="gameStatus" class="game-status"></div>
+        
+        <div class="game-container">
+          <!-- Active Cards Area -->
+          <div class="game-section">
+            <h3>Active Cards</h3>
+            <div id="activeCardsArea" class="active-cards-area"></div>
+          </div>
+          
+          <!-- Player's Cards -->
+          <div class="game-section">
+            <h3>Your Cards</h3>
+            <div class="player-cards-container">
+              <div class="keepsakes-area"></div>
+              <div id="playerCards" class="player-cards"></div>
+            </div>
+          </div>
+          
+          <!-- Opponents' Cards -->
+          <div class="game-section">
+            <h3>Opponents</h3>
+            <div id="opponentsArea" class="opponents-area"></div>
+          </div>
+          
+          <!-- Scoring Area -->
+          <div id="scoringArea" class="game-section scoring-section" style="display: none;">
+            <h3>Scoring Phase</h3>
+            <div id="abilityCards" class="ability-cards"></div>
+            <button id="doneScoring" class="btn primary-btn">Done Scoring</button>
+          </div>
+          
+          <!-- New Game Button (hidden initially) -->
+          <button id="newGameBtn" class="btn primary-btn" style="display: none;">New Game</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // Simplified room joining mechanism - initialize socket first
+    const socket = io();
+    
+    // Variables for room and player
+    const roomCode = '<%= roomCode %>';
+    const nickname = '<%= nickname %>';
+    let currentPlayerId = '';
+    let currentRoomCode = roomCode;
+    
+    // DOM Elements
+    const playersList = document.getElementById('playersList');
+    const startGameBtn = document.getElementById('startGameBtn');
+    const waitingArea = document.getElementById('waitingArea');
+    const gameArea = document.getElementById('gameArea');
+    const roomCodeDisplay = document.getElementById('roomCodeDisplay');
+    const activeCardsArea = document.getElementById('activeCardsArea');
+    const playerCards = document.getElementById('playerCards');
+    const opponentsArea = document.getElementById('opponentsArea');
+    const gameStatus = document.getElementById('gameStatus');
+    const scoringArea = document.getElementById('scoringArea');
+    const doneScoring = document.getElementById('doneScoring');
+    const newGameBtn = document.getElementById('newGameBtn');
+    
+    // Copy room link functionality
+    document.getElementById('copyRoomLink').addEventListener('click', () => {
+      const link = `${window.location.origin}/?join=${roomCode}`;
+      
+      navigator.clipboard.writeText(link)
+        .then(() => {
+          alert('Room link copied to clipboard! When others open this link, they will be prompted to enter a nickname.');
+        })
+        .catch(err => {
+          console.error('Could not copy link: ', err);
+        });
+    });
+    
+    // Socket event handlers
+    socket.on('connect', () => {
+      console.log('Socket connected with ID:', socket.id);
+      
+      // Auto-join room if nickname is provided
+      if (nickname) {
+        console.log('Auto-joining room with nickname:', nickname);
+        socket.emit('joinRoom', { roomCode, nickname });
+      }
+    });
+    
+    socket.on('updatePlayers', ({ players, canStart }) => {
+      console.log('Received updatePlayers event. Players:', players);
+      updatePlayersList(players);
+      
+      if (startGameBtn) {
+        startGameBtn.disabled = !canStart;
+      }
+    });
+    
+    socket.on('gameStarted', () => {
+      console.log('Game has started!');
+      waitingArea.style.display = 'none';
+      gameArea.style.display = 'block';
+    });
+    
+    socket.on('updateGameState', (gameState) => {
+      console.log('Received game state:', gameState);
+      updateGameUI(gameState);
+    });
+    
+    socket.on('gameReset', () => {
+      console.log('Received gameReset event from server');
+      resetGame();
+    });
+    
+    socket.on('error', (message) => {
+      console.error('Socket error:', message);
+      alert(message);
+    });
+    
+    // Game control event handlers
+    if (startGameBtn) {
+      startGameBtn.addEventListener('click', () => {
+        console.log('Starting game...');
+        socket.emit('startGame', { roomCode });
+      });
+    }
+    
+    if (doneScoring) {
+      doneScoring.addEventListener('click', () => {
+        socket.emit('doneScoring', { roomCode });
+        doneScoring.disabled = true;
+      });
+    }
+    
+    if (newGameBtn) {
+      newGameBtn.addEventListener('click', () => {
+        console.log('New Game button clicked, sending request to server');
+        socket.emit('newGame', { roomCode });
+        
+        // Disable the button temporarily to prevent multiple clicks
+        newGameBtn.disabled = true;
+        newGameBtn.textContent = 'Starting New Game...';
+        
+        // Re-enable after a delay
+        setTimeout(() => {
+          newGameBtn.disabled = false;
+          newGameBtn.textContent = 'New Game';
+          newGameBtn.style.display = 'none';
+        }, 1000);
+      });
+    }
+    
+    // Helper Functions
+    function updatePlayersList(players) {
+      if (!playersList) return;
+      
+      console.log('Updating players list with:', players);
+      playersList.innerHTML = '';
+      
+      players.forEach(player => {
+        const playerItem = document.createElement('div');
+        playerItem.classList.add('player-item');
+        
+        if (player.id === socket.id) {
+          playerItem.classList.add('current-player');
+          currentPlayerId = player.id;
+        }
+        
+        playerItem.textContent = player.nickname;
+        playersList.appendChild(playerItem);
+      });
+    }
+    
+    function updateGameUI(gameState) {
+      // First, determine if we are the current player
+      const isCurrentPlayer = gameState.currentPlayerId === currentPlayerId;
+      const isReceivingPlayer = gameState.receivingPlayerId === currentPlayerId;
+      
+      // Update game status message
+      updateGameStatus(gameState, isCurrentPlayer, isReceivingPlayer);
+      
+      // Handle turn timer
+      if (gameState.phase === 'offering' && isCurrentPlayer) {
+        startTurnTimer();
+      } else if (gameState.phase === 'selection' && isReceivingPlayer) {
+        startTurnTimer();
+      } else if (gameState.phase !== 'offering' && gameState.phase !== 'selection') {
+        clearTurnTimer();
+      }
+      
+      // Update active cards area
+      updateActiveCards(gameState.activeCards, gameState.phase, isCurrentPlayer, isReceivingPlayer);
+      
+      // Find current player data
+      const currentPlayerData = gameState.players.find(p => p.id === currentPlayerId);
+      
+      // Update player's cards
+      if (currentPlayerData) {
+        updatePlayerCards(currentPlayerData);
+      }
+      
+      // Update opponents' cards
+      updateOpponentsCards(gameState.players);
+      
+      // Show/hide scoring UI
+      if (gameState.phase === 'scoring') {
+        showScoringUI(currentPlayerData, gameState);
+      } else {
+        hideScoringUI();
+      }
+      
+      // Show game over UI if game is over
+      if (gameState.phase === 'gameOver') {
+        showGameOverUI(gameState.players);
+      }
+    }
+    
+    function updateGameStatus(gameState, isCurrentPlayer, isReceivingPlayer) {
+      if (!gameStatus) return;
+      
+      let statusText = '';
+      
+      switch (gameState.phase) {
+        case 'offering':
+          if (isCurrentPlayer) {
+            statusText = 'Your turn! Choose a card to hide (flip face-down).';
+          } else {
+            const currentPlayer = gameState.players.find(p => p.id === gameState.currentPlayerId);
+            statusText = `${currentPlayer?.nickname || 'Current player'} is choosing a card to hide...`;
+          }
+          break;
+          
+        case 'selection':
+          if (isReceivingPlayer) {
+            statusText = 'Choose which card to take into your bouquet.';
+          } else {
+            const receivingPlayer = gameState.players.find(p => p.id === gameState.receivingPlayerId);
+            statusText = `${receivingPlayer?.nickname || 'Next player'} is choosing a card...`;
+          }
+          break;
+          
+        case 'scoring':
+          statusText = 'Scoring phase! Use your card abilities before final scoring.';
+          break;
+          
+        case 'gameOver':
+          statusText = 'Game over! Final scores are shown.';
+          break;
+      }
+      
+      gameStatus.textContent = statusText;
+    }
+    
+    function updateActiveCards(activeCards, phase, isCurrentPlayer, isReceivingPlayer) {
+      if (!activeCardsArea) return;
+      
+      console.log('Updating active cards:', activeCards);
+      
+      // Clear current cards
+      activeCardsArea.innerHTML = '';
+      
+      if (!activeCards || activeCards.length === 0) {
+        console.log('No active cards to display');
+        return;
+      }
+      
+      // Create and add card elements
+      activeCards.forEach((card, index) => {
+        console.log('Creating card element for active card:', card);
+        const cardElement = createCardElement(card);
+        
+        // Add click handler based on game phase
+        if (phase === 'offering' && isCurrentPlayer) {
+          // Only face-up cards can be flipped in the offering phase
+          if (card.faceUp) {
+            cardElement.classList.add('selectable');
+            cardElement.addEventListener('click', () => {
+              console.log('Hiding card at index', index);
+              socket.emit('flipCard', { roomCode, cardIndex: index });
+            });
+          }
+        } else if (phase === 'selection' && isReceivingPlayer) {
+          // Both face-up and face-down cards can be selected
+          cardElement.classList.add('selectable');
+          cardElement.addEventListener('click', () => {
+            console.log('Selecting card at index', index);
+            socket.emit('selectCard', { roomCode, cardIndex: index });
+          });
+        }
+        
+        activeCardsArea.appendChild(cardElement);
+      });
+    }
+    
+    function updatePlayerCards(playerData) {
+      if (!playerCards) return;
+      
+      // Clear current cards
+      playerCards.innerHTML = '';
+      
+      // Combine bouquet and keepsakes but keep track of their type
+      const allCards = [
+        ...playerData.bouquet.map(card => ({ ...card, type: 'bouquet' })),
+        ...playerData.keepsakes.map(card => ({ ...card, type: 'keepsakes' }))
+      ];
+      
+      // Sort cards (you could implement game-specific ordering here)
+      // For now, we'll just put bouquet cards first, then keepsakes
+      allCards.sort((a, b) => a.type === 'bouquet' ? -1 : 1);
+      
+      // Create card elements
+      allCards.forEach(card => {
+        const cardElement = createCardElement(card);
+        cardElement.classList.add('player-card');
+        
+        // Add a class for keepsake cards to apply the shifted positioning
+        if (card.type === 'keepsakes') {
+          cardElement.classList.add('keepsake-card');
+          
+          // Add a small label to indicate keepsake
+          const label = document.createElement('div');
+          label.className = 'card-label';
+          label.textContent = 'Keepsake';
+          cardElement.appendChild(label);
+        } else {
+          // Add bouquet label
+          const label = document.createElement('div');
+          label.className = 'card-label';
+          label.textContent = 'Bouquet';
+          cardElement.appendChild(label);
+        }
+        
+        // Add drag-drop functionality for scoring phase
+        if (card.canMove) {
+          cardElement.classList.add('movable');
+          cardElement.setAttribute('draggable', true);
+          cardElement.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', JSON.stringify({
+              cardId: card.id,
+              source: card.type
+            }));
+          });
+        }
+        
+        playerCards.appendChild(cardElement);
+      });
+    }
+    
+    function updateOpponentsCards(players) {
+      if (!opponentsArea) return;
+      
+      // Clear current opponents
+      opponentsArea.innerHTML = '';
+      
+      // Add each opponent
+      players.forEach(player => {
+        if (player.id === currentPlayerId) return; // Skip current player
+        
+        const opponentElement = document.createElement('div');
+        opponentElement.classList.add('opponent');
+        
+        // Add opponent name
+        const nameElement = document.createElement('div');
+        nameElement.classList.add('opponent-name');
+        nameElement.textContent = player.nickname;
+        opponentElement.appendChild(nameElement);
+        
+        // Add opponent score if available
+        if (player.score !== undefined) {
+          const scoreElement = document.createElement('div');
+          scoreElement.classList.add('opponent-score');
+          scoreElement.textContent = `Score: ${player.score}`;
+          opponentElement.appendChild(scoreElement);
+        }
+        
+        // Add opponent's cards in a single container
+        const cardsContainer = document.createElement('div');
+        cardsContainer.classList.add('opponent-cards-container');
+        
+        // Add keepsakes background area
+        const keepsakesArea = document.createElement('div');
+        keepsakesArea.classList.add('keepsakes-area');
+        cardsContainer.appendChild(keepsakesArea);
+        
+        const cardsElement = document.createElement('div');
+        cardsElement.classList.add('opponent-cards');
+        
+        // Combine bouquet and keepsakes
+        const allCards = [
+          ...player.bouquet.map(card => ({ ...card, type: 'bouquet' })),
+          ...player.keepsakes.map(card => ({ ...card, type: 'keepsakes' }))
+        ];
+        
+        // Sort cards (bouquet first, then keepsakes)
+        allCards.sort((a, b) => a.type === 'bouquet' ? -1 : 1);
+        
+        allCards.forEach(card => {
+          const cardElement = createCardElement(card, true);
+          
+          // Add class for keepsake cards
+          if (card.type === 'keepsakes') {
+            cardElement.classList.add('keepsake-card');
+          }
+          
+          cardsElement.appendChild(cardElement);
+        });
+        
+        cardsContainer.appendChild(cardsElement);
+        opponentElement.appendChild(cardsContainer);
+        
+        opponentsArea.appendChild(opponentElement);
+      });
+    }
+    
+    function showScoringUI(playerData, gameState) {
+      if (!scoringArea || !doneScoring) return;
+      
+      scoringArea.style.display = 'block';
+      doneScoring.disabled = playerData?.doneScoring || false;
+      
+      // Add card ability UI if needed
+      const abilityCardsContainer = document.getElementById('abilityCards');
+      if (abilityCardsContainer) {
+        abilityCardsContainer.innerHTML = '';
+        
+        // Find cards with abilities
+        const cardsWithAbilities = [
+          ...(playerData.bouquet || []).filter(card => hasAbility(card.id)),
+          ...(playerData.keepsakes || []).filter(card => hasAbility(card.id))
+        ];
+        
+        if (cardsWithAbilities.length > 0) {
+          const abilityHeader = document.createElement('h3');
+          abilityHeader.textContent = 'Card Abilities';
+          abilityCardsContainer.appendChild(abilityHeader);
+          
+          cardsWithAbilities.forEach(card => {
+            const abilityCard = createCardElement(card);
+            abilityCard.classList.add('ability-card');
+            
+            // Add click handler for ability
+            abilityCard.addEventListener('click', () => {
+              handleCardAbility(card.id, playerData);
+            });
+            
+            abilityCardsContainer.appendChild(abilityCard);
+          });
+        }
+      }
+    }
+    
+    function hideScoringUI() {
+      if (!scoringArea) return;
+      
+      scoringArea.style.display = 'none';
+    }
+    
+    function showGameOverUI(players) {
+      if (!gameStatus) return;
+      
+      // Sort players by score (highest first)
+      const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
+      
+      const resultsContainer = document.createElement('div');
+      resultsContainer.classList.add('results-container');
+      
+      const resultsHeader = document.createElement('h2');
+      resultsHeader.textContent = 'Final Scores';
+      resultsContainer.appendChild(resultsHeader);
+      
+      sortedPlayers.forEach((player, index) => {
+        const playerResult = document.createElement('div');
+        playerResult.classList.add('player-result');
+        
+        if (index === 0) {
+          playerResult.classList.add('winner');
+        }
+        
+        if (player.id === currentPlayerId) {
+          playerResult.classList.add('current-player');
+        }
+        
+        playerResult.innerHTML = `
+          <div class="result-player-name">${player.nickname}</div>
+          <div class="result-player-score">${player.score} points</div>
+        `;
+        
+        resultsContainer.appendChild(playerResult);
+      });
+      
+      // Clear existing results before adding new ones
+      const existingResults = document.querySelector('.results-container');
+      if (existingResults) {
+        existingResults.remove();
+      }
+      
+      if (newGameBtn) {
+        newGameBtn.style.display = 'block';
+      }
+      
+      // Add results to game area
+      gameArea.appendChild(resultsContainer);
+    }
+    
+    function resetGame() {
+      console.log('Resetting game...');
+      
+      // Hide game over elements
+      if (newGameBtn) {
+        newGameBtn.style.display = 'none';
+      }
+      
+      // Remove results container
+      const existingResults = document.querySelector('.results-container');
+      if (existingResults) {
+        existingResults.remove();
+      }
+      
+      // Clear player cards
+      if (playerCards) {
+        playerCards.innerHTML = '';
+      }
+      
+      // Clear opponents area
+      if (opponentsArea) {
+        opponentsArea.innerHTML = '';
+      }
+      
+      // Clear active cards
+      if (activeCardsArea) {
+        activeCardsArea.innerHTML = '';
+      }
+      
+      // Clear turn timer
+      clearTurnTimer();
+      
+      // For proper flow in the new game, show waiting area, hide game area
+      if (waitingArea && gameArea) {
+        waitingArea.style.display = 'block';
+        gameArea.style.display = 'none';
+      }
+      
+      // Reset game status
+      if (gameStatus) {
+        gameStatus.textContent = 'New game is ready to start!';
+      }
+      
+      console.log('Game reset complete');
+    }
+    
+    function createCardElement(card, isOpponent = false) {
+      if (!card) {
+        console.error('Attempted to create card element with undefined card');
+        return document.createElement('div'); // Return empty div to avoid errors
+      }
+      
+      console.log('Creating card element for:', card);
+      
+      const cardElement = document.createElement('div');
+      cardElement.classList.add('card');
+      cardElement.dataset.cardId = card.id;
+      
+      if (card.faceUp) {
+        cardElement.classList.add('face-up');
+        cardElement.classList.add(card.color);
+        
+        // Card content for face-up card
+        const cardHeader = document.createElement('div');
+        cardHeader.classList.add('card-header');
+        
+        const cardName = document.createElement('div');
+        cardName.classList.add('card-name');
+        cardName.textContent = card.name;
+        cardHeader.appendChild(cardName);
+        
+        // Add hearts
+        const cardHearts = document.createElement('div');
+        cardHearts.classList.add('card-hearts');
+        for (let i = 0; i < card.hearts; i++) {
+          const heart = document.createElement('span');
+          heart.textContent = '❤️';
+          cardHearts.appendChild(heart);
+        }
+        cardHeader.appendChild(cardHearts);
+        
+        cardElement.appendChild(cardHeader);
+        
+        // Card effect text
+        const cardEffect = document.createElement('div');
+        cardEffect.classList.add('card-effect');
+        cardEffect.textContent = card.effectText;
+        cardElement.appendChild(cardEffect);
+        
+        // Card flavor text
+        const cardFlavor = document.createElement('div');
+        cardFlavor.classList.add('card-flavor');
+        cardFlavor.textContent = card.flavorText;
+        cardElement.appendChild(cardFlavor);
+      } else {
+        cardElement.classList.add('face-down');
+        
+        // Simple card back design
+        const cardBack = document.createElement('div');
+        cardBack.classList.add('card-back');
+        cardBack.textContent = 'Tussie Mussie';
+        cardElement.appendChild(cardBack);
+      }
+      
+      // Make opponent cards smaller
+      if (isOpponent) {
+        cardElement.classList.add('opponent-card');
+      }
+      
+      return cardElement;
+    }
+    
+    function hasAbility(cardId) {
+      return ['pink-larkspur', 'snapdragon', 'marigold'].includes(cardId);
+    }
+    
+    function handleCardAbility(cardId, playerData) {
+      // For simplicity, we'll implement only a basic UI for abilities
+      switch (cardId) {
+        case 'pink-larkspur':
+          // Allow player to replace one card with a new one
+          alert('Pink Larkspur: Click a card to replace it with a new one from the deck.');
+          
+          // Add click handlers to all player cards
+          const allPlayerCards = document.querySelectorAll('.player-card');
+          allPlayerCards.forEach(cardElement => {
+            cardElement.classList.add('selectable');
+            cardElement.addEventListener('click', () => {
+              const targetCardId = cardElement.dataset.cardId;
+              socket.emit('useCardAbility', {
+                roomCode,
+                cardId: 'pink-larkspur',
+                targetCardId
+              });
+              
+              // Remove selection state
+              allPlayerCards.forEach(c => c.classList.remove('selectable'));
+            }, { once: true });
+          });
+          break;
+          
+        case 'snapdragon':
+          // Allow player to move up to 2 cards between bouquet and keepsakes
+          alert('Snapdragon: Click up to 2 cards to move them between bouquet and keepsakes.');
+          
+          // Add click handlers to all player cards
+          const playerCards = document.querySelectorAll('.player-card');
+          let movesLeft = 2;
+          
+          playerCards.forEach(cardElement => {
+            cardElement.classList.add('selectable');
+            cardElement.addEventListener('click', () => {
+              const targetCardId = cardElement.dataset.cardId;
+              socket.emit('useCardAbility', {
+                roomCode,
+                cardId: 'snapdragon',
+                targetCardId
+              });
+              
+              movesLeft--;
+              
+              if (movesLeft <= 0) {
+                // Remove selection state
+                playerCards.forEach(c => c.classList.remove('selectable'));
+              }
+            }, { once: true });
+          });
+          break;
+          
+        case 'marigold':
+          // Player must discard one card
+          alert('Marigold: You must discard one of your other cards.');
+          
+          // Add click handlers to all player cards except Marigold
+          const otherCards = document.querySelectorAll('.player-card:not([data-card-id="marigold"])');
+          otherCards.forEach(cardElement => {
+            cardElement.classList.add('selectable');
+            cardElement.addEventListener('click', () => {
+              const targetCardId = cardElement.dataset.cardId;
+              socket.emit('useCardAbility', {
+                roomCode,
+                cardId: 'marigold',
+                targetCardId
+              });
+              
+              // Remove selection state
+              otherCards.forEach(c => c.classList.remove('selectable'));
+            }, { once: true });
+          });
+          break;
+      }
+    }
+    
+    // Turn timer functionality
+    let timerInterval = null;
+    const turnTimer = document.getElementById('turnTimer');
+    const timerValue = document.getElementById('timerValue');
+    const TURN_TIME = 30; // seconds
+    let timeRemaining = TURN_TIME;
+
+    function startTurnTimer() {
+      // Clear any existing timer
+      clearTurnTimer();
+      
+      // Reset time
+      timeRemaining = TURN_TIME;
+      updateTimerDisplay();
+      
+      // Show timer
+      turnTimer.classList.add('visible');
+      turnTimer.classList.remove('urgent');
+      
+      // Start countdown
+      timerInterval = setInterval(() => {
+        timeRemaining--;
+        updateTimerDisplay();
+        
+        // Make timer urgent when less than 10 seconds remain
+        if (timeRemaining <= 10) {
+          turnTimer.classList.add('urgent');
+        }
+        
+        // Stop at 0
+        if (timeRemaining <= 0) {
+          clearInterval(timerInterval);
+        }
+      }, 1000);
+    }
+
+    function clearTurnTimer() {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+      turnTimer.classList.remove('visible');
+    }
+
+    function updateTimerDisplay() {
+      timerValue.textContent = `${timeRemaining}s`;
+    }
+  </script>
+</body>
+</html>

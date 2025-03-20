@@ -1,0 +1,599 @@
+/* public/css/styles.css */
+
+/* Base styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --primary-color: #7c4dff;
+  --secondary-color: #651fff;
+  --text-color: #333;
+  --light-bg: #f5f5f5;
+  --card-bg: #ffffff;
+  --border-color: #ddd;
+  --red-color: #e53935;
+  --pink-color: #ec407a;
+  --purple-color: #8e24aa;
+  --yellow-color: #ffa000;
+  --white-color: #f5f5f5;
+  --success-color: #4caf50;
+  --error-color: #f44336;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.6;
+  color: var(--text-color);
+  background-color: var(--light-bg);
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--primary-color);
+}
+
+.subtitle {
+  font-style: italic;
+  color: #666;
+}
+
+.room-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+#roomCodeDisplay {
+  font-weight: bold;
+  letter-spacing: 2px;
+}
+
+/* Buttons */
+.btn {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.primary-btn {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.primary-btn:hover {
+  background-color: var(--secondary-color);
+}
+
+.small-btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  background-color: #eee;
+}
+
+.small-btn:hover {
+  background-color: #ddd;
+}
+
+/* Forms */
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+input[type="text"] {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+/* Tabs */
+.tabs {
+  margin-bottom: 2rem;
+}
+
+.tab-buttons {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.tab-btn {
+  padding: 0.75rem 1.5rem;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.tab-btn.active {
+  border-bottom-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.tab-panel {
+  display: none;
+  padding: 1.5rem 0;
+}
+
+.tab-panel.active {
+  display: block;
+}
+
+/* Rules section */
+.rules-section {
+  background-color: var(--card-bg);
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.rules-section h2 {
+  margin-bottom: 1rem;
+  color: var(--primary-color);
+}
+
+.rules-content ol, 
+.rules-content ul {
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+/* Lobby */
+.lobby-container {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+.players-section {
+  flex: 1;
+}
+
+.players-list {
+  background-color: var(--card-bg);
+  border-radius: 8px;
+  padding: 1rem;
+  min-height: 200px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.player-item {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.player-item.current-player {
+  font-weight: bold;
+  color: var(--primary-color);
+}
+
+.player-item:last-child {
+  border-bottom: none;
+}
+
+.lobby-controls {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.lobby-help {
+  font-size: 0.875rem;
+  color: #666;
+}
+
+/* Game area */
+.game-status {
+  background-color: var(--card-bg);
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: 8px;
+  text-align: center;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.game-container {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+}
+
+.game-section {
+  background-color: var(--card-bg);
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.game-section h3 {
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5rem;
+}
+
+/* Active cards area */
+.active-cards-area {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-top: 1rem;
+  min-height: 200px;
+}
+
+/* Player areas */
+.player-areas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.player-area {
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.area-label {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+.my-bouquet-area, 
+.my-keepsakes-area {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: center;
+  min-height: 150px;
+}
+
+.drop-area {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Opponents area */
+.opponents-area {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.opponent {
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.opponent-name {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.opponent-score {
+  margin-bottom: 1rem;
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.opponent-bouquet, 
+.opponent-keepsakes {
+  margin-bottom: 1rem;
+}
+
+.opponent-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+/* Card styles */
+.card {
+  width: 140px;
+  height: 200px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s, box-shadow 0.2s;
+  background-color: #f8f8f8;
+  position: relative;
+}
+
+.card.selectable {
+  cursor: pointer;
+}
+
+.card.selectable:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.card.movable {
+  cursor: grab;
+}
+
+.opponent-card {
+  width: 100px;
+  height: 140px;
+  font-size: 0.75rem;
+}
+
+.card.face-up {
+  background-color: var(--card-bg);
+  padding: 0.5rem;
+}
+
+.card.face-down {
+  background-color: #e8e8e8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background-image: linear-gradient(45deg, #f1f1f1 25%, transparent 25%, transparent 75%, #f1f1f1 75%, #f1f1f1), 
+                    linear-gradient(45deg, #f1f1f1 25%, transparent 25%, transparent 75%, #f1f1f1 75%, #f1f1f1);
+  background-size: 20px 20px;
+  background-position: 0 0, 10px 10px;
+}
+
+.card-back {
+  transform: rotate(-45deg);
+  color: #555;
+  font-weight: 600;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.card-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+}
+
+.card-hearts {
+  display: flex;
+  gap: 2px;
+}
+
+.card-effect {
+  flex: 1;
+  background-color: #f5f5f5;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.card-flavor {
+  font-style: italic;
+  font-size: 0.8rem;
+  color: #666;
+  text-align: center;
+  padding: 0.5rem;
+}
+
+/* Card colors */
+.card.red {
+  border: 3px solid var(--red-color);
+}
+
+.card.pink {
+  border: 3px solid var(--pink-color);
+}
+
+.card.purple {
+  border: 3px solid var(--purple-color);
+}
+
+.card.yellow {
+  border: 3px solid var(--yellow-color);
+}
+
+.card.white {
+  border: 3px solid var(--white-color);
+}
+
+/* Scoring area */
+.scoring-section {
+  text-align: center;
+}
+
+.ability-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.ability-card {
+  width: 120px;
+  height: 180px;
+  font-size: 0.8rem;
+}
+
+/* Results area */
+.results-container {
+  background-color: var(--card-bg);
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-top: 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.results-container h2 {
+  margin-bottom: 1.5rem;
+  color: var(--primary-color);
+}
+
+.player-result {
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  background-color: #f9f9f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.player-result.winner {
+  background-color: #fff9c4;
+  border: 2px solid #ffd600;
+}
+
+.player-result.current-player {
+  font-weight: 600;
+}
+
+.result-player-score {
+  font-weight: 600;
+  color: var(--primary-color);
+}
+/* Add these styles to your styles.css file */
+
+/* Player cards container - single row layout */
+.player-cards-container {
+  position: relative;
+  min-height: 230px;
+  padding: 1rem;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+}
+
+.player-cards {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  position: relative;
+}
+
+/* Keepsake card positioning */
+.card.keepsake-card {
+  position: relative;
+  top: 30px; /* Shift keepsakes down */
+}
+
+/* Add a subtle background for keepsakes area */
+.keepsakes-area {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 75px;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-radius: 0 0 8px 8px;
+  z-index: 0;
+}
+
+/* Card label tags */
+.card-label {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  background-color: #f0f0f0;
+  padding: 2px 6px;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  white-space: nowrap;
+}
+
+/* Opponent cards layout */
+.opponent-cards-container {
+  position: relative;
+  min-height: 180px;
+  padding: 1rem;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.opponent-cards {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  position: relative;
+}
+
+.opponent-card.keepsake-card {
+  top: 20px; /* Smaller shift for opponent cards */
+}
+
+.opponent .keepsakes-area {
+  height: 55px; /* Smaller area for opponent keepsakes */
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .player-areas,
+  .lobby-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .card {
+    width: 120px;
+    height: 180px;
+  }
+  
+  .opponent-card {
+    width: 80px;
+    height: 120px;
+  }
+}
