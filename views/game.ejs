@@ -426,10 +426,23 @@
         return;
       }
       
+      // Add a message for receiving player during offering phase
+      if (phase === 'offering' && isReceivingPlayer) {
+        const waitingMessage = document.createElement('div');
+        waitingMessage.classList.add('waiting-message');
+        waitingMessage.textContent = 'Waiting for other player to choose a card to hide...';
+        activeCardsArea.appendChild(waitingMessage);
+        return; // Don't show cards to receiving player during offering phase
+      }
+      
       // Create and add card elements
       activeCards.forEach((card, index) => {
         console.log('Creating card element for active card:', card);
-        const cardElement = createCardElement(card);
+        
+        // During offering phase, cards are only visible to current player
+        const shouldShowCard = !(phase === 'offering' && !isCurrentPlayer);
+        
+        const cardElement = createCardElement(card, false, shouldShowCard);
         
         // Add click handler based on game phase
         if (phase === 'offering' && isCurrentPlayer) {
@@ -710,17 +723,30 @@
       console.log('Game reset complete');
     }
     
-    function createCardElement(card, isOpponent = false) {
+    function createCardElement(card, isOpponent = false, isVisible = true) {
       if (!card) {
         console.error('Attempted to create card element with undefined card');
         return document.createElement('div'); // Return empty div to avoid errors
       }
       
-      console.log('Creating card element for:', card);
+      console.log('Creating card element for:', card, 'visible:', isVisible);
       
       const cardElement = document.createElement('div');
       cardElement.classList.add('card');
       cardElement.dataset.cardId = card.id;
+      
+      // Apply hidden state if card should not be visible
+      if (!isVisible) {
+        cardElement.classList.add('hidden-card');
+        
+        // Add mystery placeholder
+        const mysteryContent = document.createElement('div');
+        mysteryContent.classList.add('card-mystery');
+        mysteryContent.innerHTML = '<span>?</span>';
+        cardElement.appendChild(mysteryContent);
+        
+        return cardElement;
+      }
       
       if (card.faceUp) {
         cardElement.classList.add('face-up');
