@@ -379,6 +379,8 @@
     let currentPlayerId = '';
     let currentRoomCode = roomCode;
     let pinkLarkspurAbilityInProgress = false;
+    let snapdragonAbilityInProgress = false;
+    let marigoldAbilityInProgress = false;
     
     // DOM Elements
     const playersList = document.getElementById('playersList');
@@ -877,8 +879,10 @@
         gameArea.removeAttribute('data-phase');
       }
       
-      // Reset Pink Larkspur ability flag
+      // Reset all ability flags
       pinkLarkspurAbilityInProgress = false;
+      snapdragonAbilityInProgress = false;
+      marigoldAbilityInProgress = false;
     }
     
     function showGameOverUI(players) {
@@ -948,8 +952,10 @@
     function resetGame() {
       console.log('Resetting game...');
       
-      // Reset Pink Larkspur ability flag
+      // Reset all ability flags
       pinkLarkspurAbilityInProgress = false;
+      snapdragonAbilityInProgress = false;
+      marigoldAbilityInProgress = false;
       
       // Hide game over elements
       if (newGameBtn) {
@@ -1079,7 +1085,7 @@
       switch (cardId) {
         case 'pink-larkspur':
           // Check if ability is already in progress to prevent recursion
-          if (pinkLarkspurAbilityInProgress) return;
+          if (pinkLarkspurAbilityInProgress || snapdragonAbilityInProgress || marigoldAbilityInProgress) return;
           
           // Set flag to indicate ability is in progress
           pinkLarkspurAbilityInProgress = true;
@@ -1126,6 +1132,12 @@
           break;
           
         case 'snapdragon':
+          // Check if ability is already in progress to prevent recursion
+          if (pinkLarkspurAbilityInProgress || snapdragonAbilityInProgress || marigoldAbilityInProgress) return;
+          
+          // Set flag to indicate ability is in progress
+          snapdragonAbilityInProgress = true;
+          
           // Allow player to move up to 2 cards between bouquet and keepsakes
           alert('Snapdragon: Click up to 2 cards to move them between bouquet and keepsakes.');
           
@@ -1147,12 +1159,20 @@
               if (movesLeft <= 0) {
                 // Remove selection state
                 playerCards.forEach(c => c.classList.remove('selectable'));
+                // Reset the flag when ability is complete
+                snapdragonAbilityInProgress = false;
               }
             }, { once: true });
           });
           break;
           
         case 'marigold':
+          // Check if ability is already in progress to prevent recursion
+          if (pinkLarkspurAbilityInProgress || snapdragonAbilityInProgress || marigoldAbilityInProgress) return;
+          
+          // Set flag to indicate ability is in progress
+          marigoldAbilityInProgress = true;
+          
           // Player must discard one card
           alert('Marigold: You must discard one of your other cards.');
           
@@ -1170,6 +1190,8 @@
               
               // Remove selection state
               otherCards.forEach(c => c.classList.remove('selectable'));
+              // Reset the flag when ability is complete
+              marigoldAbilityInProgress = false;
             }, { once: true });
           });
           break;
