@@ -725,7 +725,7 @@
         // Have Bouqets and Keepsakes in the same line
         const allCards = [
           ...player.bouquet.map(card => ({ ...card, type: 'bouquet' })),
-          ...player.keepsakes.map(card => ({ ...card, type: 'keepsakes', faceUp: false })) // remove "faceUp: false" to see opponents' keepsakes 
+          ...player.keepsakes.map(card => ({ ...card, type: 'keepsakes', faceUp: true })) // change to "faceUp: false" to  hide opponents' keepsakes 
         ];
         
         // Sort cards (bouquet first, then keepsakes)
