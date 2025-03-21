@@ -703,8 +703,9 @@ class Game {
         bouquet: p.bouquet,
         keepsakes: p.keepsakes.map(c => ({ 
           ...c, 
-          // Only reveal keepsake cards during scoring phase
-          faceUp: revealKeepsakes ? true : false
+          // Only hide other players' keepsakes during gameplay
+          // Players can see their own keepsakes at all times
+          faceUp: revealKeepsakes || c.owner === p.id
         })),
         score: p.score,
         doneScoring: p.doneScoring

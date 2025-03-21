@@ -375,8 +375,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Update keepsakes cards
     myKeepsakesArea.innerHTML = '';
     playerData.keepsakes.forEach(card => {
-      // For keepsakes, we show the back of the card
-      const cardElement = createCardElement({ ...card, faceUp: false });
+      // Use the card's actual faceUp state instead of forcing face-down
+      const cardElement = createCardElement(card);
       cardElement.classList.add('player-card');
       
       // Add drag-drop functionality for scoring phase

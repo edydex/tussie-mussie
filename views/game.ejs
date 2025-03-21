@@ -481,8 +481,8 @@
       
       // Combine bouquet and keepsakes but keep track of their type
       const allCards = [
-        ...playerData.bouquet.map(card => ({ ...card, type: 'bouquet' })),
-        ...playerData.keepsakes.map(card => ({ ...card, type: 'keepsakes' }))
+        ...playerData.bouquet.map(card => ({ ...card, type: 'bouquet', faceUp: true })),
+        ...playerData.keepsakes.map(card => ({ ...card, type: 'keepsakes', faceUp:true }))
       ];
       
       // Sort cards (you could implement game-specific ordering here)
@@ -575,7 +575,7 @@
         // Combine bouquet and keepsakes
         const allCards = [
           ...player.bouquet.map(card => ({ ...card, type: 'bouquet' })),
-          ...player.keepsakes.map(card => ({ ...card, type: 'keepsakes' }))
+          ...player.keepsakes.map(card => ({ ...card, type: 'keepsakes', faceUp: false }))
         ];
         
         // Sort cards (bouquet first, then keepsakes)
