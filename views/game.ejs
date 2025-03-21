@@ -380,6 +380,7 @@
     let currentRoomCode = roomCode;
     let pinkLarkspurAbilityInProgress = false;
     let snapdragonAbilityInProgress = false;
+    let snapdragonMovesUsed = 0;  // Track how many Snapdragon moves have been used
     let marigoldAbilityInProgress = false;
     
     // DOM Elements
@@ -882,6 +883,7 @@
       // Reset all ability flags
       pinkLarkspurAbilityInProgress = false;
       snapdragonAbilityInProgress = false;
+      snapdragonMovesUsed = 0;  // Reset Snapdragon moves counter
       marigoldAbilityInProgress = false;
     }
     
@@ -955,6 +957,7 @@
       // Reset all ability flags
       pinkLarkspurAbilityInProgress = false;
       snapdragonAbilityInProgress = false;
+      snapdragonMovesUsed = 0;  // Reset Snapdragon moves counter
       marigoldAbilityInProgress = false;
       
       // Hide game over elements
@@ -1133,17 +1136,23 @@
           
         case 'snapdragon':
           // Check if ability is already in progress to prevent recursion
-          if (pinkLarkspurAbilityInProgress || snapdragonAbilityInProgress || marigoldAbilityInProgress) return;
+          if (pinkLarkspurAbilityInProgress || marigoldAbilityInProgress) return;
+          
+          // Check if we've already used both Snapdragon moves
+          if (snapdragonMovesUsed >= 2) {
+            alert('You have already used Snapdragon\'s ability twice.');
+            return;
+          }
           
           // Set flag to indicate ability is in progress
           snapdragonAbilityInProgress = true;
           
           // Allow player to move up to 2 cards between bouquet and keepsakes
-          alert('Snapdragon: Click up to 2 cards to move them between bouquet and keepsakes.');
+          const movesRemaining = 2 - snapdragonMovesUsed;
+          alert(`Snapdragon: Click a card to move it between bouquet and keepsakes. (${movesRemaining} move${movesRemaining > 1 ? 's' : ''} remaining)`);
           
           // Add click handlers to all player cards
           const playerCards = document.querySelectorAll('.player-card');
-          let movesLeft = 2;
           
           playerCards.forEach(cardElement => {
             cardElement.classList.add('selectable');
@@ -1155,12 +1164,23 @@
                 targetCardId
               });
               
-              movesLeft--;
-              if (movesLeft <= 0) {
-                // Remove selection state
-                playerCards.forEach(c => c.classList.remove('selectable'));
-                // Reset the flag when ability is complete
-                snapdragonAbilityInProgress = false;
+              // Increment the counter for Snapdragon moves
+              snapdragonMovesUsed++;
+              
+              // Remove selection state
+              playerCards.forEach(c => c.classList.remove('selectable'));
+              
+              // Reset the ability in progress flag to allow another use
+              snapdragonAbilityInProgress = false;
+              
+              // If we've used both moves, show a message
+              if (snapdragonMovesUsed >= 2) {
+                alert('You have used both Snapdragon ability moves.');
+              } else {
+                // Show how many moves are left
+                setTimeout(() => {
+                  alert(`Snapdragon: You have ${2 - snapdragonMovesUsed} move remaining. Click on the Snapdragon card again to use it.`);
+                }, 500);
               }
             }, { once: true });
           });
