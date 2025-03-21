@@ -146,12 +146,12 @@ class Game {
     // Create all cards based on the PDF
     this.deck = [
       // Red cards
-      new Card("camellia", "Camellia", "red", 0, 
+      new Card("camellia", "Camellia", "red", 1, 
                (player) => 0, 
                "No effect", 
                "You're a flame in my heart"),
                
-      new Card("red-rose", "Red Rose", "red", 1, 
+      new Card("red-rose", "Red Rose", "red", 0, 
                (player) => {
                  const hearts = player.getAllCards().reduce((sum, card) => sum + card.hearts, 0);
                  return hearts;
@@ -159,7 +159,7 @@ class Game {
                "+1 point for each of your hearts", 
                "I love you"),
                
-      new Card("red-tulip", "Red Tulip", "red", 1, 
+      new Card("red-tulip", "Red Tulip", "red", 0, 
                (player) => {
                  const redCards = player.getAllCards().filter(card => card.color === "red").length;
                  return redCards;
@@ -167,15 +167,15 @@ class Game {
                "+1 point for each of your red cards, including this one", 
                "I love you"),
       
-      // Pink cards
-      new Card("amaryllis", "Amaryllis", "pink", 0, 
+      new Card("amaryllis", "Amaryllis", "red", 0, 
                (player) => {
                  return player.bouquet.length;
                }, 
                "+1 point for each card in your bouquet", 
                "I am determined"),
-               
-      new Card("pink-rose", "Pink Rose", "pink", 1, 
+
+      // Pink cards               
+      new Card("pink-rose", "Pink Rose", "pink", 0, 
                (player) => {
                  const pinkCards = player.getAllCards().filter(card => card.color === "pink").length;
                  return pinkCards;
@@ -228,7 +228,7 @@ class Game {
                "+3 points if you have no hearts", 
                "Please forgive me"),
                
-      new Card("violet", "Violet", "purple", 1, 
+      new Card("violet", "Violet", "purple", 0, 
                (player) => {
                  const purpleCards = player.getAllCards().filter(card => card.color === "purple").length;
                  return purpleCards;
