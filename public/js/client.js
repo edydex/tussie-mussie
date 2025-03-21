@@ -157,6 +157,12 @@ document.addEventListener('DOMContentLoaded', () => {
       updateGameUI(gameState);
     });
     
+    socket.on('roundComplete', ({ gameRound }) => {
+      console.log('Round complete, moving to round:', gameRound);
+      // Show round transition message
+      showRoundTransition(gameRound);
+    });
+    
     socket.on('playerLeft', ({ players, canStart }) => {
       console.log('Player left, remaining players:', players);
       updatePlayersList(players);
@@ -235,6 +241,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateGameUI(gameState) {
     console.log('Received game state:', gameState);
     
+    // Update round information if available
+    updateRoundInfo(gameState);
+    
     // First, determine if we are the current player
     const isCurrentPlayer = gameState.currentPlayerId === currentPlayerId;
     const isReceivingPlayer = gameState.receivingPlayerId === currentPlayerId;
@@ -270,6 +279,76 @@ document.addEventListener('DOMContentLoaded', () => {
     if (gameState.phase === 'gameOver') {
       showGameOverUI(gameState.players);
     }
+  }
+  
+  // Update round information display
+  function updateRoundInfo(gameState) {
+    // Create or update round info display
+    let roundInfoElement = document.getElementById('roundInfo');
+    if (!roundInfoElement) {
+      roundInfoElement = document.createElement('div');
+      roundInfoElement.id = 'roundInfo';
+      roundInfoElement.classList.add('round-info');
+      
+      // Insert after game status
+      if (gameStatus && gameStatus.parentNode) {
+        gameStatus.parentNode.insertBefore(roundInfoElement, gameStatus.nextSibling);
+      }
+    }
+    
+    if (gameState.gameRound) {
+      roundInfoElement.innerHTML = `<strong>Round ${gameState.gameRound} of 3</strong>`;
+      roundInfoElement.style.display = 'block';
+    } else {
+      roundInfoElement.style.display = 'none';
+    }
+  }
+  
+  // Show round transition message
+  function showRoundTransition(gameRound) {
+    // Create a modal or overlay for round transition
+    let transitionOverlay = document.getElementById('roundTransition');
+    if (!transitionOverlay) {
+      transitionOverlay = document.createElement('div');
+      transitionOverlay.id = 'roundTransition';
+      transitionOverlay.classList.add('round-transition');
+      document.body.appendChild(transitionOverlay);
+    }
+    
+    transitionOverlay.innerHTML = `
+      <div class="transition-content">
+        <h2>Round ${gameRound - 1} Complete!</h2>
+        <p>Moving to Round ${gameRound} of 3</p>
+        <div class="player-scores"></div>
+        <div class="continue-button">Continue</div>
+      </div>
+    `;
+    
+    // Add current scores if available
+    const playerScores = document.querySelector('#roundTransition .player-scores');
+    const players = document.querySelectorAll('.player-item');
+    
+    players.forEach(player => {
+      const playerId = player.dataset.playerId;
+      const playerName = player.textContent;
+      const scoreElement = document.createElement('div');
+      scoreElement.classList.add('transition-player-score');
+      scoreElement.innerHTML = `<span class="player-name">${playerName}</span>: <span class="score-value">Calculating...</span>`;
+      playerScores.appendChild(scoreElement);
+    });
+    
+    // Show the overlay
+    transitionOverlay.style.display = 'flex';
+    
+    // Add click handler to continue button
+    document.querySelector('#roundTransition .continue-button').addEventListener('click', () => {
+      transitionOverlay.style.display = 'none';
+    });
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+      transitionOverlay.style.display = 'none';
+    }, 5000);
   }
   
   // Update the game status message
@@ -394,6 +473,20 @@ document.addEventListener('DOMContentLoaded', () => {
       myKeepsakesArea.appendChild(cardElement);
     });
     
+    // Update player score display - show both current round and total score
+    const playerScoreDisplay = document.getElementById('playerScoreDisplay');
+    if (playerScoreDisplay) {
+      if (playerData.totalScore !== undefined) {
+        playerScoreDisplay.style.display = 'block';
+        playerScoreDisplay.innerHTML = `
+          <div>Current Round Score: ${playerData.score || 0}</div>
+          <div>Total Score: ${playerData.totalScore || 0}</div>
+        `;
+      } else {
+        playerScoreDisplay.style.display = 'none';
+      }
+    }
+    
     // Set up drop areas for scoring phase
     setupDropAreas(playerData);
   }
@@ -474,12 +567,22 @@ document.addEventListener('DOMContentLoaded', () => {
       nameElement.textContent = player.nickname;
       opponentElement.appendChild(nameElement);
       
-      // Add opponent score if available
+      // Add opponent scores - both current round and total
       if (player.score !== undefined) {
-        const scoreElement = document.createElement('div');
-        scoreElement.classList.add('opponent-score');
-        scoreElement.textContent = `Score: ${player.score}`;
-        opponentElement.appendChild(scoreElement);
+        const scoreContainer = document.createElement('div');
+        scoreContainer.classList.add('opponent-scores');
+        
+        const roundScoreElement = document.createElement('div');
+        roundScoreElement.classList.add('opponent-round-score');
+        roundScoreElement.textContent = `Round Score: ${player.score}`;
+        scoreContainer.appendChild(roundScoreElement);
+        
+        const totalScoreElement = document.createElement('div');
+        totalScoreElement.classList.add('opponent-total-score');
+        totalScoreElement.textContent = `Total Score: ${player.totalScore || 0}`;
+        scoreContainer.appendChild(totalScoreElement);
+        
+        opponentElement.appendChild(scoreContainer);
       }
       
       // Add opponent's bouquet
@@ -573,8 +676,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function showGameOverUI(players) {
     if (!gameStatus) return;
     
-    // Sort players by score (highest first)
-    const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
+    // Sort players by totalScore (highest first)
+    const sortedPlayers = [...players].sort((a, b) => b.totalScore - a.totalScore);
     
     const resultsContainer = document.createElement('div');
     resultsContainer.classList.add('results-container');
@@ -582,6 +685,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultsHeader = document.createElement('h2');
     resultsHeader.textContent = 'Final Scores';
     resultsContainer.appendChild(resultsHeader);
+    
+    // Add explanation that scores are accumulated over 3 rounds
+    const explanation = document.createElement('p');
+    explanation.classList.add('results-explanation');
+    explanation.textContent = 'Scores accumulated over 3 rounds';
+    resultsContainer.appendChild(explanation);
     
     sortedPlayers.forEach((player, index) => {
       const playerResult = document.createElement('div');
@@ -595,9 +704,20 @@ document.addEventListener('DOMContentLoaded', () => {
         playerResult.classList.add('current-player');
       }
       
+      // Create round scores display
+      let roundScoresHtml = '';
+      if (player.roundScores && player.roundScores.length > 0) {
+        roundScoresHtml = '<div class="round-scores">';
+        player.roundScores.forEach((score, idx) => {
+          roundScoresHtml += `<span class="round-score">Round ${idx + 1}: ${score}</span>`;
+        });
+        roundScoresHtml += '</div>';
+      }
+      
       playerResult.innerHTML = `
         <div class="result-player-name">${player.nickname}</div>
-        <div class="result-player-score">${player.score} points</div>
+        <div class="result-player-score">${player.totalScore} points</div>
+        ${roundScoresHtml}
       `;
       
       resultsContainer.appendChild(playerResult);
@@ -780,6 +900,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const existingResults = document.querySelector('.results-container');
     if (existingResults) {
       existingResults.remove();
+    }
+    
+    // Remove round transition overlay
+    const transitionOverlay = document.getElementById('roundTransition');
+    if (transitionOverlay) {
+      transitionOverlay.style.display = 'none';
     }
     
     // Show waiting area, hide game area

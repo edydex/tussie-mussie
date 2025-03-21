@@ -179,10 +179,20 @@ io.on('connection', (socket) => {
     
     game.playerDoneScoring(socket.id);
     
-    // If all players are done, end the game
+    // If all players are done, finalize scoring
     if (game.allPlayersDoneScoring()) {
       game.finalizeScoring();
-      game.setPhase('gameOver');
+      
+      // Check if we've completed all game rounds
+      if (game.isGameComplete()) {
+        // All 3 rounds complete, move to game over
+        game.setPhase('gameOver');
+      } else {
+        // Start a new round
+        game.startNewRound();
+        io.to(roomCode).emit('roundComplete', { gameRound: game.gameRound });
+      }
+      
       clearTimeout(game.scoringTimer);
       updateGameState(roomCode);
     }
@@ -326,15 +336,25 @@ function startScoringTimer(roomCode) {
     clearTimeout(game.scoringTimer);
   }
   
-  // Set new timer (60 seconds)
+  // Set new timer (90 seconds)
   game.scoringTimer = setTimeout(() => {
     console.log('Scoring time expired for room:', roomCode);
     
-    // Finalize scoring and end the game
+    // Finalize scoring
     game.finalizeScoring();
-    game.setPhase('gameOver');
+    
+    // Check if we've completed all game rounds
+    if (game.isGameComplete()) {
+      // All 3 rounds complete, end the game
+      game.setPhase('gameOver');
+    } else {
+      // Start a new round
+      game.startNewRound();
+      io.to(roomCode).emit('roundComplete', { gameRound: game.gameRound });
+    }
+    
     updateGameState(roomCode);
-  }, 90000); // 60 seconds
+  }, 90000); // 90 seconds
 }
 
 // Start server

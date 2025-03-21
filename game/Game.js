@@ -40,8 +40,10 @@ class Player {
     this.nickname = nickname;
     this.bouquet = []; // face-up cards
     this.keepsakes = []; // face-down cards
-    this.score = 0;
+    this.score = 0; // Current round score
+    this.totalScore = 0; // Accumulated score across rounds
     this.doneScoring = false;
+    this.roundScores = []; // Store scores for each round
   }
 
   addCard(card, location) {
@@ -104,6 +106,21 @@ class Player {
     this.score = score;
     return score;
   }
+  
+  // Add accumulated score from current round to total
+  accumulateScore() {
+    this.roundScores.push(this.score);
+    this.totalScore += this.score;
+    return this.totalScore;
+  }
+  
+  // Reset cards for a new round but keep accumulated score
+  resetForNewRound() {
+    this.bouquet = [];
+    this.keepsakes = [];
+    this.score = 0;
+    this.doneScoring = false;
+  }
 }
 
 // Game class definition
@@ -115,7 +132,8 @@ class Game {
     this.activeCards = [];
     this.currentPlayerIndex = 0;
     this.currentPhase = 'waiting'; // waiting, offering, selection, scoring, gameOver
-    this.round = 0;
+    this.round = 0; // Round within a game
+    this.gameRound = 1; // Track which game round we're on (1-3)
     this.turnCount = 0; // Add turn counter to track total turns
     this.turnTimer = null;
     this.scoringTimer = null;
@@ -392,7 +410,7 @@ class Game {
     // Calculate target cards per player based on player count
     const cardsPerPlayer = this.players.length === 2 ? 4 : (this.players.length === 3 ? 3 : 2);
     
-    console.log(`Turn: ${this.turnCount}, Round: ${this.round}, Target cards per player: ${cardsPerPlayer}`);
+    console.log(`Turn: ${this.turnCount}, Round: ${this.round}, Game Round: ${this.gameRound}, Target cards per player: ${cardsPerPlayer}`);
     console.log('Player cards:');
     
     // Log current card counts for each player
@@ -682,7 +700,44 @@ class Game {
     // Calculate final scores for all players
     for (const player of this.players) {
       player.calculateScore();
+      // Accumulate the score for this round
+      player.accumulateScore();
     }
+  }
+  
+  // Start a new round within the same game
+  startNewRound() {
+    console.log(`Starting game round ${this.gameRound + 1}`);
+    
+    // Increment game round
+    this.gameRound++;
+    
+    // Reset player cards but keep accumulated scores
+    this.players.forEach(player => {
+      player.resetForNewRound();
+    });
+    
+    // Reset game state for new round
+    this.round = 0;
+    this.turnCount = 0;
+    this.activeCards = [];
+    this.currentPhase = 'offering';
+    
+    // Randomly select first player for new round
+    this.currentPlayerIndex = Math.floor(Math.random() * this.players.length);
+    
+    // Reinitialize deck
+    this.initializeDeck();
+    
+    // Start first turn of new round
+    this.startNewTurn();
+    
+    return true;
+  }
+  
+  // Check if all game rounds are complete
+  isGameComplete() {
+    return this.gameRound >= 3;
   }
 
   getGameState() {
@@ -693,6 +748,7 @@ class Game {
       roomCode: this.roomCode,
       phase: this.currentPhase,
       round: this.round,
+      gameRound: this.gameRound, // Include the game round number
       turnCount: this.turnCount,
       currentPlayerId: this.getCurrentPlayerId(),
       receivingPlayerId: this.getReceivingPlayerId(),
@@ -707,7 +763,9 @@ class Game {
           // Players can see their own keepsakes at all times
           faceUp: revealKeepsakes || c.owner === p.id
         })),
-        score: p.score,
+        score: p.score, // Current round score
+        totalScore: p.totalScore, // Accumulated score across rounds
+        roundScores: p.roundScores, // Scores for each round
         doneScoring: p.doneScoring
       })),
       deckSize: this.deck.length
