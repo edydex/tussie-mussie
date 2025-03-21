@@ -572,10 +572,10 @@
         const cardsElement = document.createElement('div');
         cardsElement.classList.add('opponent-cards');
         
-        // Combine bouquet and keepsakes
+        // Have Bouqets and Keepsakes in the same line
         const allCards = [
           ...player.bouquet.map(card => ({ ...card, type: 'bouquet' })),
-          ...player.keepsakes.map(card => ({ ...card, type: 'keepsakes', faceUp: false }))
+          ...player.keepsakes.map(card => ({ ...card, type: 'keepsakes', faceUp: false })) // remove "faceUp: false" to see opponents' keepsakes 
         ];
         
         // Sort cards (bouquet first, then keepsakes)
