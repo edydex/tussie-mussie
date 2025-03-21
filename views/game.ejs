@@ -378,6 +378,7 @@
     const nickname = '<%= nickname %>';
     let currentPlayerId = '';
     let currentRoomCode = roomCode;
+    let pinkLarkspurAbilityInProgress = false;
     
     // DOM Elements
     const playersList = document.getElementById('playersList');
@@ -875,6 +876,9 @@
       if (gameArea) {
         gameArea.removeAttribute('data-phase');
       }
+      
+      // Reset Pink Larkspur ability flag
+      pinkLarkspurAbilityInProgress = false;
     }
     
     function showGameOverUI(players) {
@@ -943,6 +947,9 @@
     
     function resetGame() {
       console.log('Resetting game...');
+      
+      // Reset Pink Larkspur ability flag
+      pinkLarkspurAbilityInProgress = false;
       
       // Hide game over elements
       if (newGameBtn) {
@@ -1071,6 +1078,12 @@
       // For simplicity, we'll implement only a basic UI for abilities
       switch (cardId) {
         case 'pink-larkspur':
+          // Check if ability is already in progress to prevent recursion
+          if (pinkLarkspurAbilityInProgress) return;
+          
+          // Set flag to indicate ability is in progress
+          pinkLarkspurAbilityInProgress = true;
+          
           // First, draw two cards from the deck
           socket.emit('useCardAbility', {
             roomCode,
@@ -1102,6 +1115,9 @@
                     // Remove selection state and instructions
                     allPlayerCards.forEach(c => c.classList.remove('selectable'));
                     hideAbilityInstructions();
+                    
+                    // Reset the flag when ability is complete
+                    pinkLarkspurAbilityInProgress = false;
                   }, { once: true });
                 });
               });
