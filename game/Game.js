@@ -560,19 +560,45 @@ class Game {
     // For marigold, do not allow re-use if already used
     if (card.id === 'marigold' && card.abilityUsed) return false;
     
+    // For pink-larkspur, do not allow re-use if already used
+    if (card.id === 'pink-larkspur' && card.abilityUsed) return false;
+    
     // Implement card abilities
     switch (card.id) {
       case 'pink-larkspur':
-        // Allow player to draw 2 cards and replace one of their cards
-        if (this.deck.length >= 2) {
+        // First step: Draw two cards and let player choose between them
+        if (!targetCardId && this.deck.length >= 2) {
           const drawnCards = [this.deck.pop(), this.deck.pop()];
+          
+          // Add this line to make the drawn cards face-up
+          drawnCards.forEach(card => card.faceUp = true);
+          
+          // Store drawn cards on the player object for later use
+          player.drawnCards = drawnCards;
+          // Return the drawn cards to be displayed to the player
+          return {
+            success: true,
+            ability: 'pink-larkspur-draw',
+            drawnCards: drawnCards
+          };
+        }
+        
+        // Second step: Handle player's selection and card replacement
+        else if (targetCardId && targetCardId.includes('|')) {
+          // Parse the composite ID containing selectedDrawnCardIndex|targetPlayerCardId
+          const [selectedDrawnCardIndex, targetPlayerCardId] = targetCardId.split('|');
+          const drawnCardIndex = parseInt(selectedDrawnCardIndex);
+          
+          if (isNaN(drawnCardIndex) || drawnCardIndex < 0 || drawnCardIndex > 1) {
+            return false;
+          }
           
           // Find the target card to replace
           let targetCard = null;
           let targetLocation = null;
           
           for (const c of player.bouquet) {
-            if (c.id === targetCardId) {
+            if (c.id === targetPlayerCardId) {
               targetCard = c;
               targetLocation = 'bouquet';
               break;
@@ -581,7 +607,7 @@ class Game {
           
           if (!targetCard) {
             for (const c of player.keepsakes) {
-              if (c.id === targetCardId) {
+              if (c.id === targetPlayerCardId) {
                 targetCard = c;
                 targetLocation = 'keepsakes';
                 break;
@@ -589,20 +615,33 @@ class Game {
             }
           }
           
-          if (targetCard && targetLocation) {
+          if (targetCard && targetLocation && player.drawnCards && player.drawnCards.length === 2) {
             // Remove the target card
-            player.removeCard(targetCardId, targetLocation);
+            player.removeCard(targetPlayerCardId, targetLocation);
             
-            // Add one of the drawn cards to the same location
-            // (For simplicity, we'll use the first drawn card)
-            player.addCard(drawnCards[0], targetLocation);
+            // Add the selected drawn card to the same location
+            player.addCard(player.drawnCards[drawnCardIndex], targetLocation);
             
-            // Put the second drawn card back in the deck
-            this.deck.push(drawnCards[1]);
+            // Put the other drawn card back in the deck
+            this.deck.push(player.drawnCards[drawnCardIndex === 0 ? 1 : 0]);
             this.shuffleDeck();
             
-            return true;
+            // Clear the temporarily stored drawn cards
+            player.drawnCards = null;
+            
+            // Mark ability as used
+            card.abilityUsed = true;
+            
+            return {
+              success: true,
+              ability: 'pink-larkspur-replace'
+            };
           }
+        }
+        // Store drawn cards when first called
+        else if (Array.isArray(targetCardId)) {
+          player.drawnCards = targetCardId;
+          return true;
         }
         break;
         

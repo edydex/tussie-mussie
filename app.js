@@ -166,7 +166,14 @@ io.on('connection', (socket) => {
     
     if (!game || game.currentPhase !== 'scoring') return;
     
-    game.useCardAbility(socket.id, cardId, targetCardId);
+    const result = game.useCardAbility(socket.id, cardId, targetCardId);
+    
+    // Check if the ability returned a special result object (for Pink Larkspur)
+    if (result && typeof result === 'object' && result.success) {
+      // Send the result back to the client that requested it
+      socket.emit('cardAbilityResult', result);
+    }
+    
     updateGameState(roomCode);
   });
   
