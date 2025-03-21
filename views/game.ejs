@@ -240,6 +240,56 @@
       font-style: italic;
       color: #666;
     }
+
+    /* Card ability highlight styles */
+    .card.has-ability {
+      box-shadow: 0 0 10px 3px gold;
+      animation: ability-pulse 1.5s infinite;
+      cursor: pointer;
+      position: relative;
+      z-index: 5;
+    }
+
+    .card.has-ability:after {
+      content: "⚡";
+      position: absolute;
+      top: -10px;
+      right: -10px;
+      background-color: gold;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: bold;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+      z-index: 6;
+    }
+
+    @keyframes ability-pulse {
+      0% {
+        box-shadow: 0 0 10px 3px rgba(255, 215, 0, 0.6);
+      }
+      50% {
+        box-shadow: 0 0 15px 5px rgba(255, 215, 0, 0.9);
+      }
+      100% {
+        box-shadow: 0 0 10px 3px rgba(255, 215, 0, 0.6);
+      }
+    }
+    
+    /* Ability instructions */
+    .ability-instructions {
+      background-color: #fff9c4;
+      border: 2px dashed #ffd600;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      text-align: center;
+      font-weight: 500;
+    }
   </style>
 </head>
 <body>
@@ -470,6 +520,11 @@
         clearTurnTimer();
       }
       
+      // Set game phase attribute for CSS targeting
+      if (gameArea) {
+        gameArea.setAttribute('data-phase', gameState.phase);
+      }
+      
       // Update active cards area
       updateActiveCards(gameState.activeCards, gameState.phase, isCurrentPlayer, isReceivingPlayer);
       
@@ -647,6 +702,16 @@
           cardElement.appendChild(label);
         }
         
+        // Highlight cards with abilities during scoring phase
+        if (hasAbility(card.id) && gameArea.getAttribute('data-phase') === 'scoring' && !card.abilityUsed) {
+          cardElement.classList.add('has-ability');
+          
+          // Add click handler for ability activation
+          cardElement.addEventListener('click', () => {
+            handleCardAbility(card.id, playerData);
+          });
+        }
+        
         // Add drag-drop functionality for scoring phase
         if (card.canMove) {
           cardElement.classList.add('movable');
@@ -748,7 +813,11 @@
     function showScoringUI(playerData, gameState) {
       if (!scoringArea || !doneScoring) return;
       
+      // Mark the game area with current phase for CSS targeting
+      gameArea.setAttribute('data-phase', 'scoring');
+      
       scoringArea.style.display = 'block';
+      
       // Check if the player has an unused marigold ability card
       const allCards = [...(playerData.bouquet || []), ...(playerData.keepsakes || [])];
       const hasUnusedMarigold = allCards.some(card => card.id === 'marigold' && !card.abilityUsed);
@@ -763,40 +832,36 @@
           warningElement = document.createElement('div');
           warningElement.id = 'marigoldWarning';
           warningElement.classList.add('ability-warning');
-          warningElement.innerHTML = '⚠️ You must use Marigold’s ability (discard one card) before finishing scoring.';
+          warningElement.innerHTML = '⚠️ You must use Marigold\'s ability (discard one card) before finishing scoring.';
           scoringArea.insertBefore(warningElement, doneScoring);
         }
       } else if (warningElement) {
         warningElement.remove();
       }
       
-      // Add card ability UI if needed
+      // Add card ability instructions instead of duplicating the cards
       const abilityCardsContainer = document.getElementById('abilityCards');
       if (abilityCardsContainer) {
         abilityCardsContainer.innerHTML = '';
         
         // Find cards with abilities
         const cardsWithAbilities = [
-          ...(playerData.bouquet || []).filter(card => hasAbility(card.id)),
-          ...(playerData.keepsakes || []).filter(card => hasAbility(card.id))
+          ...(playerData.bouquet || []).filter(card => hasAbility(card.id) && !card.abilityUsed),
+          ...(playerData.keepsakes || []).filter(card => hasAbility(card.id) && !card.abilityUsed)
         ];
         
         if (cardsWithAbilities.length > 0) {
-          const abilityHeader = document.createElement('h3');
-          abilityHeader.textContent = 'Card Abilities';
-          abilityCardsContainer.appendChild(abilityHeader);
+          const instructionsElement = document.createElement('div');
+          instructionsElement.classList.add('ability-instructions');
           
-          cardsWithAbilities.forEach(card => {
-            const abilityCard = createCardElement(card);
-            abilityCard.classList.add('ability-card');
-            
-            // Add click handler for ability
-            abilityCard.addEventListener('click', () => {
-              handleCardAbility(card.id, playerData);
-            });
-            
-            abilityCardsContainer.appendChild(abilityCard);
-          });
+          const abilityNames = cardsWithAbilities.map(card => card.name).join(', ');
+          instructionsElement.innerHTML = `
+            <div>⚡ <strong>Card Abilities Available</strong> ⚡</div>
+            <div>Click on highlighted cards in your collection to use their abilities.</div>
+            <div>Available: ${abilityNames}</div>
+          `;
+          
+          abilityCardsContainer.appendChild(instructionsElement);
         }
       }
     }
@@ -805,6 +870,11 @@
       if (!scoringArea) return;
       
       scoringArea.style.display = 'none';
+      
+      // Remove scoring phase marker
+      if (gameArea) {
+        gameArea.removeAttribute('data-phase');
+      }
     }
     
     function showGameOverUI(players) {
