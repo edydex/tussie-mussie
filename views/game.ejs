@@ -382,6 +382,7 @@
     let snapdragonAbilityInProgress = false;
     let snapdragonMovesUsed = 0;  // Track how many Snapdragon moves have been used
     let marigoldAbilityInProgress = false;
+    let cardPositions = new Map(); // Store card positions for consistent rendering
     
     // DOM Elements
     const playersList = document.getElementById('playersList');
@@ -671,6 +672,20 @@
     function updatePlayerCards(playerData) {
       if (!playerCards) return;
       
+      // Save current card positions before clearing the container
+      const allCurrentCards = document.querySelectorAll('.player-card');
+      allCurrentCards.forEach((cardElement) => {
+        if (cardElement.dataset.cardId) {
+          const rect = cardElement.getBoundingClientRect();
+          cardPositions.set(cardElement.dataset.cardId, {
+            index: Array.from(playerCards.children).indexOf(cardElement),
+            left: rect.left,
+            top: rect.top,
+            isKeepsake: cardElement.classList.contains('keepsake-card')
+          });
+        }
+      });
+      
       // Clear current cards
       playerCards.innerHTML = '';
       
@@ -680,12 +695,28 @@
         ...playerData.keepsakes.map(card => ({ ...card, type: 'keepsakes', faceUp:true }))
       ];
       
-      // Sort cards (you could implement game-specific ordering here)
-      // For now, we'll just put bouquet cards first, then keepsakes
-      allCards.sort((a, b) => a.type === 'bouquet' ? -1 : 1);
+      // Group cards first by type (bouquet and keepsakes) then sort within groups
+      const bouquetCards = allCards.filter(card => card.type === 'bouquet');
+      const keepsakeCards = allCards.filter(card => card.type === 'keepsakes');
+      
+      // Sort cards within their groups based on previous positions
+      bouquetCards.sort((a, b) => {
+        const posA = cardPositions.has(a.id) ? cardPositions.get(a.id).index : 999;
+        const posB = cardPositions.has(b.id) ? cardPositions.get(b.id).index : 999;
+        return posA - posB;
+      });
+      
+      keepsakeCards.sort((a, b) => {
+        const posA = cardPositions.has(a.id) ? cardPositions.get(a.id).index : 999;
+        const posB = cardPositions.has(b.id) ? cardPositions.get(b.id).index : 999;
+        return posA - posB;
+      });
+      
+      // Join the cards with bouquet cards first, then keepsakes
+      const sortedCards = [...bouquetCards, ...keepsakeCards];
       
       // Create card elements
-      allCards.forEach(card => {
+      sortedCards.forEach((card, index) => {
         const cardElement = createCardElement(card);
         cardElement.classList.add('player-card');
         
@@ -726,6 +757,23 @@
               source: card.type
             }));
           });
+        }
+        
+        // Apply smooth animation for cards that move between bouquet and keepsakes
+        const prevPos = cardPositions.get(card.id);
+        if (prevPos) {
+          const isMovedCard = (prevPos.isKeepsake && card.type === 'bouquet') || 
+                             (!prevPos.isKeepsake && card.type === 'keepsakes');
+          
+          if (isMovedCard) {
+            cardElement.style.transition = 'transform 0.5s ease-in-out, opacity 0.3s';
+            cardElement.style.opacity = '0';
+            
+            // Enable animation after a short delay to ensure positions are calculated
+            setTimeout(() => {
+              cardElement.style.opacity = '1';
+            }, 50);
+          }
         }
         
         playerCards.appendChild(cardElement);
@@ -880,11 +928,12 @@
         gameArea.removeAttribute('data-phase');
       }
       
-      // Reset all ability flags
+      // Reset all ability flags and card positions
       pinkLarkspurAbilityInProgress = false;
       snapdragonAbilityInProgress = false;
-      snapdragonMovesUsed = 0;  // Reset Snapdragon moves counter
+      snapdragonMovesUsed = 0;  
       marigoldAbilityInProgress = false;
+      cardPositions.clear();
     }
     
     function showGameOverUI(players) {
@@ -954,11 +1003,12 @@
     function resetGame() {
       console.log('Resetting game...');
       
-      // Reset all ability flags
+      // Reset all ability flags and card positions
       pinkLarkspurAbilityInProgress = false;
       snapdragonAbilityInProgress = false;
-      snapdragonMovesUsed = 0;  // Reset Snapdragon moves counter
+      snapdragonMovesUsed = 0;  
       marigoldAbilityInProgress = false;
+      cardPositions.clear();
       
       // Hide game over elements
       if (newGameBtn) {
@@ -1111,8 +1161,40 @@
                 
                 allPlayerCards.forEach(cardElement => {
                   cardElement.classList.add('selectable');
+                  
+                  // Add hover effect to preview replacement
+                  cardElement.addEventListener('mouseenter', () => {
+                    cardElement.style.boxShadow = '0 0 10px 5px rgba(255, 0, 0, 0.5)';
+                    cardElement.style.opacity = '0.8';
+                  });
+                  
+                  cardElement.addEventListener('mouseleave', () => {
+                    cardElement.style.boxShadow = '';
+                    cardElement.style.opacity = '1';
+                  });
+                  
                   cardElement.addEventListener('click', () => {
                     const targetCardId = cardElement.dataset.cardId;
+                    
+                    // Save the position and visual state of the card being replaced
+                    const cardRect = cardElement.getBoundingClientRect();
+                    const isKeepsake = cardElement.classList.contains('keepsake-card');
+                    const selectedCard = result.drawnCards[selectedDrawnCardIndex];
+                    
+                    // Store position data for the new card to maintain visual consistency
+                    if (selectedCard && selectedCard.id) {
+                      cardPositions.set(selectedCard.id, {
+                        index: Array.from(playerCards.children).indexOf(cardElement),
+                        isKeepsake: isKeepsake,
+                        left: cardRect.left,
+                        top: cardRect.top
+                      });
+                    }
+                    
+                    // Visual effect for replacement
+                    cardElement.style.transition = 'all 0.3s ease';
+                    cardElement.style.opacity = '0';
+                    cardElement.style.transform = 'scale(0.8)';
                     
                     // Send both selections together
                     socket.emit('useCardAbility', {
@@ -1122,7 +1204,15 @@
                     });
                     
                     // Remove selection state and instructions
-                    allPlayerCards.forEach(c => c.classList.remove('selectable'));
+                    allPlayerCards.forEach(c => {
+                      c.classList.remove('selectable');
+                      c.style.boxShadow = '';
+                      c.style.opacity = '1';
+                      
+                      // Remove hover event listeners
+                      c.onmouseenter = null;
+                      c.onmouseleave = null;
+                    });
                     hideAbilityInstructions();
                     
                     // Reset the flag when ability is complete
@@ -1154,10 +1244,62 @@
           // Add click handlers to all player cards
           const playerCards = document.querySelectorAll('.player-card');
           
+          // Store current positions of all cards before movement
+          playerCards.forEach((card, index) => {
+            if (card.dataset.cardId) {
+              const rect = card.getBoundingClientRect();
+              cardPositions.set(card.dataset.cardId, {
+                index: index,
+                left: rect.left,
+                top: rect.top,
+                isKeepsake: card.classList.contains('keepsake-card')
+              });
+            }
+          });
+          
           playerCards.forEach(cardElement => {
             cardElement.classList.add('selectable');
+            
+            // Add hover effect to preview movement
+            cardElement.addEventListener('mouseenter', () => {
+              const isKeepsake = cardElement.classList.contains('keepsake-card');
+              cardElement.style.transition = 'transform 0.2s ease';
+              cardElement.style.transform = isKeepsake ? 'translateY(-30px)' : 'translateY(30px)';
+            });
+            
+            cardElement.addEventListener('mouseleave', () => {
+              cardElement.style.transition = 'transform 0.2s ease';
+              cardElement.style.transform = '';
+            });
+            
             cardElement.addEventListener('click', () => {
               const targetCardId = cardElement.dataset.cardId;
+              const isKeepsake = cardElement.classList.contains('keepsake-card');
+              
+              // Toggle the keepsake state for this card in position tracking
+              if (cardPositions.has(targetCardId)) {
+                const pos = cardPositions.get(targetCardId);
+                pos.isKeepsake = !pos.isKeepsake;
+              }
+              
+              // Animate the card movement immediately for visual feedback
+              cardElement.style.transition = 'transform 0.5s ease, top 0.5s ease';
+              
+              if (isKeepsake) {
+                // Move from keepsake to bouquet (move up)
+                cardElement.style.transform = 'translateY(-30px)';
+                setTimeout(() => {
+                  cardElement.classList.remove('keepsake-card');
+                }, 100);
+              } else {
+                // Move from bouquet to keepsake (move down)
+                cardElement.style.transform = 'translateY(30px)';
+                setTimeout(() => {
+                  cardElement.classList.add('keepsake-card');
+                }, 100);
+              }
+              
+              // Send the move to server
               socket.emit('useCardAbility', {
                 roomCode,
                 cardId: 'snapdragon',
@@ -1167,8 +1309,17 @@
               // Increment the counter for Snapdragon moves
               snapdragonMovesUsed++;
               
-              // Remove selection state
-              playerCards.forEach(c => c.classList.remove('selectable'));
+              // Force a layout recalculation to make other cards update positions
+              requestAnimationFrame(() => {
+                // Remove selection state from all cards
+                playerCards.forEach(c => {
+                  c.classList.remove('selectable');
+                  
+                  // Remove hover event listeners
+                  c.onmouseenter = null;
+                  c.onmouseleave = null;
+                });
+              });
               
               // Reset the ability in progress flag to allow another use
               snapdragonAbilityInProgress = false;
@@ -1196,12 +1347,47 @@
           // Player must discard one card
           alert('Marigold: You must discard one of your other cards.');
           
+          // Store current positions of all cards before discard
+          const allCards = document.querySelectorAll('.player-card');
+          allCards.forEach((card, index) => {
+            if (card.dataset.cardId) {
+              const rect = card.getBoundingClientRect();
+              cardPositions.set(card.dataset.cardId, {
+                index: index,
+                left: rect.left,
+                top: rect.top,
+                isKeepsake: card.classList.contains('keepsake-card')
+              });
+            }
+          });
+          
           // Add click handlers to all player cards except Marigold
           const otherCards = document.querySelectorAll('.player-card:not([data-card-id="marigold"])');
           otherCards.forEach(cardElement => {
             cardElement.classList.add('selectable');
+            
+            // Add hover effect to preview discard
+            cardElement.addEventListener('mouseenter', () => {
+              cardElement.style.boxShadow = '0 0 10px 5px rgba(255, 0, 0, 0.5)';
+              cardElement.style.opacity = '0.8';
+              cardElement.style.transform = 'scale(0.95)';
+            });
+            
+            cardElement.addEventListener('mouseleave', () => {
+              cardElement.style.boxShadow = '';
+              cardElement.style.opacity = '1';
+              cardElement.style.transform = 'scale(1)';
+            });
+            
             cardElement.addEventListener('click', () => {
               const targetCardId = cardElement.dataset.cardId;
+              
+              // Visual effect for discard
+              cardElement.style.transition = 'all 0.3s ease';
+              cardElement.style.opacity = '0';
+              cardElement.style.transform = 'scale(0.8)';
+              
+              // Send discard to server
               socket.emit('useCardAbility', {
                 roomCode,
                 cardId: 'marigold',
@@ -1209,7 +1395,17 @@
               });
               
               // Remove selection state
-              otherCards.forEach(c => c.classList.remove('selectable'));
+              otherCards.forEach(c => {
+                c.classList.remove('selectable');
+                c.style.boxShadow = '';
+                c.style.opacity = '1';
+                c.style.transform = 'scale(1)';
+                
+                // Remove hover event listeners
+                c.onmouseenter = null;
+                c.onmouseleave = null;
+              });
+              
               // Reset the flag when ability is complete
               marigoldAbilityInProgress = false;
             }, { once: true });
