@@ -172,6 +172,7 @@ io.on('connection', (socket) => {
     if (result && typeof result === 'object' && result.success) {
       // Send the result back to the client that requested it
       socket.emit('cardAbilityResult', result);
+      console.log(`Emitting card ability result: ${result.ability}`, result);
     }
     
     updateGameState(roomCode);

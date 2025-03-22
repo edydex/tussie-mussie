@@ -1148,82 +1148,84 @@
             roomCode,
             cardId: 'pink-larkspur'
           });
-          
-          // Listen for the response with the drawn cards
-          socket.once('cardAbilityResult', (result) => {
+
+          // Create a persistent function to handle both steps of the ability
+          function handlePinkLarkspurResponse(result) {
+            console.log("Pink larkspur response:", result);
+            
+            // Step 1: Process drawn cards
             if (result.ability === 'pink-larkspur-draw' && result.drawnCards) {
               showDrawnCardsSelection(result.drawnCards, (selectedDrawnCardIndex) => {
-                // After player selects a drawn card, prompt to select which card to replace
-                const allPlayerCards = document.querySelectorAll('.player-card');
+                // Save the selected card index for step 2
+                const selectedCard = result.drawnCards[selectedDrawnCardIndex];
+                console.log("Selected drawn card:", selectedCard);
                 
-                // Create instruction message
+                // After player selects a drawn card, prompt to select which card to replace
                 showAbilityInstructions('Now select one of your cards to replace with the chosen card.');
                 
+                // Get all player cards and make them selectable
+                const allPlayerCards = document.querySelectorAll('.player-card');
                 allPlayerCards.forEach(cardElement => {
+                  // Add visual indicators
                   cardElement.classList.add('selectable');
                   
-                  // Add hover effect to preview replacement
-                  cardElement.addEventListener('mouseenter', () => {
-                    cardElement.style.boxShadow = '0 0 10px 5px rgba(255, 0, 0, 0.5)';
-                    cardElement.style.opacity = '0.8';
+                  // Add hover effect
+                  cardElement.addEventListener('mouseenter', function() {
+                    this.style.boxShadow = '0 0 10px 5px rgba(255, 0, 0, 0.5)';
+                    this.style.opacity = '0.8';
                   });
                   
-                  cardElement.addEventListener('mouseleave', () => {
-                    cardElement.style.boxShadow = '';
-                    cardElement.style.opacity = '1';
+                  cardElement.addEventListener('mouseleave', function() {
+                    this.style.boxShadow = '';
+                    this.style.opacity = '1';
                   });
                   
-                  cardElement.addEventListener('click', () => {
-                    const targetCardId = cardElement.dataset.cardId;
+                  // Add click handler for selection
+                  cardElement.addEventListener('click', function cardClickHandler() {
+                    // Remove event listeners from all cards
+                    allPlayerCards.forEach(c => {
+                      c.classList.remove('selectable');
+                      c.style.boxShadow = '';
+                      c.style.opacity = '1';
+                      c.removeEventListener('mouseenter', arguments.callee);
+                      c.removeEventListener('mouseleave', arguments.callee);
+                      c.removeEventListener('click', cardClickHandler);
+                    });
                     
-                    // Save the position and visual state of the card being replaced
-                    const cardRect = cardElement.getBoundingClientRect();
-                    const isKeepsake = cardElement.classList.contains('keepsake-card');
-                    const selectedCard = result.drawnCards[selectedDrawnCardIndex];
+                    const targetCardId = this.dataset.cardId;
+                    console.log("Selected player card to replace:", targetCardId);
                     
-                    // Store position data for the new card to maintain visual consistency
-                    if (selectedCard && selectedCard.id) {
-                      cardPositions.set(selectedCard.id, {
-                        index: Array.from(playerCards.children).indexOf(cardElement),
-                        isKeepsake: isKeepsake,
-                        left: cardRect.left,
-                        top: cardRect.top
-                      });
-                    }
+                    // Visual feedback for the card being replaced
+                    this.style.transition = 'all 0.3s ease';
+                    this.style.opacity = '0';
+                    this.style.transform = 'scale(0.8)';
                     
-                    // Visual effect for replacement
-                    cardElement.style.transition = 'all 0.3s ease';
-                    cardElement.style.opacity = '0';
-                    cardElement.style.transform = 'scale(0.8)';
-                    
-                    // Send both selections together
+                    // Send the card replacement request
                     socket.emit('useCardAbility', {
                       roomCode,
                       cardId: 'pink-larkspur',
                       targetCardId: `${selectedDrawnCardIndex}|${targetCardId}`
                     });
                     
-                    // Remove selection state and instructions
-                    allPlayerCards.forEach(c => {
-                      c.classList.remove('selectable');
-                      c.style.boxShadow = '';
-                      c.style.opacity = '1';
-                      
-                      // Remove hover event listeners
-                      c.onmouseenter = null;
-                      c.onmouseleave = null;
-                    });
                     hideAbilityInstructions();
-                    
-                    // Reset the flag when ability is complete
-                    pinkLarkspurAbilityInProgress = false;
-                  }, { once: true });
+                  });
                 });
               });
+            } 
+            // Step 2: Handle replacement confirmation
+            else if (result.ability === 'pink-larkspur-replace') {
+              console.log("Card replacement successful");
+              // Clean up the event listener
+              socket.off('cardAbilityResult', handlePinkLarkspurResponse);
+              // Reset the ability flag
+              pinkLarkspurAbilityInProgress = false;
             }
-          });
-          break;
+          }
           
+          // Listen for both steps of the ability process
+          socket.on('cardAbilityResult', handlePinkLarkspurResponse);
+          break;
+        
         case 'snapdragon':
           // Check if ability is already in progress to prevent recursion
           if (pinkLarkspurAbilityInProgress || marigoldAbilityInProgress) return;
