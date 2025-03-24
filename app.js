@@ -163,10 +163,13 @@ io.on('connection', (socket) => {
     
     // Advance to next turn or round
     if (game.currentPhase === 'scoring') {
-      // If we've moved to scoring phase, start scoring timer
-      startScoringTimer(roomCode);
+      // No scoring timer - players will manually indicate when they're done
+      // Clear any existing timer just in case
+      if (game.scoringTimer) {
+        clearTimeout(game.scoringTimer);
+      }
     } else {
-      // Otherwise start the next turn timer
+      // Start the next turn timer
       startTurnTimer(roomCode);
     }
     
@@ -226,7 +229,10 @@ io.on('connection', (socket) => {
         io.to(roomCode).emit('roundComplete', { gameRound: game.gameRound });
       }
       
-      clearTimeout(game.scoringTimer);
+      // Clear any existing timer just in case
+      if (game.scoringTimer) {
+        clearTimeout(game.scoringTimer);
+      }
       updateGameState(roomCode);
     }
   });
@@ -374,7 +380,7 @@ function startTurnTimer(roomCode) {
         
         // Advance to next turn or round
         if (game.currentPhase === 'scoring') {
-          startScoringTimer(roomCode);
+          startTurnTimer(roomCode);
         } else {
           startTurnTimer(roomCode);
         }
@@ -387,7 +393,7 @@ function startTurnTimer(roomCode) {
       
       // Advance to next turn or round
       if (game.currentPhase === 'scoring') {
-        startScoringTimer(roomCode);
+        startTurnTimer(roomCode);
       } else {
         startTurnTimer(roomCode);
       }
@@ -395,37 +401,6 @@ function startTurnTimer(roomCode) {
       updateGameState(roomCode);
     }
   }, 30000); // 30 seconds
-}
-
-// Start scoring timer
-function startScoringTimer(roomCode) {
-  const game = activeGames[roomCode];
-  if (!game) return;
-  
-  // Clear any existing timer
-  if (game.scoringTimer) {
-    clearTimeout(game.scoringTimer);
-  }
-  
-  // Set new timer (90 seconds)
-  game.scoringTimer = setTimeout(() => {
-    console.log('Scoring time expired for room:', roomCode);
-    
-    // Finalize scoring
-    game.finalizeScoring();
-    
-    // Check if we've completed all game rounds
-    if (game.isGameComplete()) {
-      // All 3 rounds complete, end the game
-      game.setPhase('gameOver');
-    } else {
-      // Start a new round
-      game.startNewRound();
-      io.to(roomCode).emit('roundComplete', { gameRound: game.gameRound });
-    }
-    
-    updateGameState(roomCode);
-  }, 90000); // 90 seconds
 }
 
 // Start server
