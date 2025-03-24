@@ -136,6 +136,7 @@ class Game {
     this.turnCount = 0; // Add turn counter to track total turns
     this.turnTimer = null;
     this.scoringTimer = null;
+    this.hostId = null; // Track the host player ID
     
     // Initialize deck
     this.initializeDeck();
@@ -322,6 +323,12 @@ class Game {
     
     const player = new Player(id, nickname);
     this.players.push(player);
+    
+    // Set the first player as the host
+    if (!this.hostId) {
+      this.hostId = id;
+    }
+    
     return player;
   }
 
@@ -725,6 +732,26 @@ class Game {
     return this.gameRound >= 3;
   }
 
+  // Check if a player is the host
+  isHost(playerId) {
+    return playerId === this.hostId;
+  }
+  
+  // Get the host ID
+  getHostId() {
+    return this.hostId;
+  }
+  
+  // Update host if current host disconnects
+  updateHostIfNeeded(disconnectedPlayerId) {
+    if (disconnectedPlayerId === this.hostId && this.players.length > 0) {
+      // Assign the next player as host
+      this.hostId = this.players[0].id;
+      return true;
+    }
+    return false;
+  }
+
   getGameState() {
     // Determine if we're in scoring phase to show keepsake cards
     const revealKeepsakes = this.currentPhase === 'scoring' || this.currentPhase === 'gameOver';
@@ -738,9 +765,11 @@ class Game {
       currentPlayerId: this.getCurrentPlayerId(),
       receivingPlayerId: this.getReceivingPlayerId(),
       activeCards: this.activeCards,
+      hostId: this.hostId, // Include the host ID in the game state
       players: this.players.map(p => ({
         id: p.id,
         nickname: p.nickname,
+        isHost: p.id === this.hostId, // Include whether player is host
         cards: p.cards.map(c => ({ 
           ...c, 
           // Only hide other players' keepsakes during gameplay

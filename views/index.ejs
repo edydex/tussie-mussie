@@ -23,13 +23,13 @@
         
         <div class="tab-panels">
           <div id="createRoomPanel" class="tab-panel active">
-            <form id="createRoomForm">
+            <!-- Ensure the nickname is included in the form submission when creating rooms -->
+            <form id="createRoomForm" action="/create-room" method="post">
               <div class="form-group">
                 <label for="nicknameInput">Your Nickname:</label>
-                <input type="text" id="nicknameInput" name="nickname" required maxlength="20">
+                <input type="text" id="nicknameInput" name="nickname" required placeholder="Enter your nickname">
               </div>
-              
-              <button type="submit" class="btn primary-btn">Create New Room</button>
+              <button type="submit" class="btn primary-btn">Create Room</button>
             </form>
           </div>
           

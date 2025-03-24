@@ -21,6 +21,8 @@ app.use(express.urlencoded({ extended: true }));
 
 // Store active games
 const activeGames = {};
+// Track room creators to ensure they become hosts
+const roomCreators = {};
 
 // Routes
 app.get('/', (req, res) => {
@@ -29,8 +31,16 @@ app.get('/', (req, res) => {
 
 app.post('/create-room', (req, res) => {
   const roomCode = generateRoomCode();
+  const nickname = req.body.nickname || 'Host'; // Get creator's nickname from form
+  
   activeGames[roomCode] = new Game(roomCode);
-  res.redirect(`/room/${roomCode}`);
+  
+  // Store the creator's nickname to identify them when they join
+  roomCreators[roomCode] = nickname;
+  
+  console.log(`Created new room: ${roomCode} with creator: ${nickname}`);
+  
+  res.redirect(`/room/${roomCode}?nickname=${encodeURIComponent(nickname)}`);
 });
 
 app.get('/room/:roomCode', (req, res) => {
@@ -71,6 +81,14 @@ io.on('connection', (socket) => {
       return;
     }
     
+    // Check if this player is the room creator and should be host
+    if (roomCreators[roomCode] && roomCreators[roomCode] === nickname) {
+      console.log(`Setting ${nickname} as host for room ${roomCode}`);
+      game.hostId = socket.id;
+      // Clear the creator entry as we've set the host
+      delete roomCreators[roomCode];
+    }
+    
     // Store room code for disconnection handling
     currentRoomCode = roomCode;
     socket.join(roomCode);
@@ -79,7 +97,8 @@ io.on('connection', (socket) => {
     // Send updated player list to all clients in the room
     io.to(roomCode).emit('updatePlayers', {
       players: game.getPlayers(),
-      canStart: game.canStart()
+      canStart: game.canStart(),
+      hostId: game.getHostId()
     });
   });
   
@@ -90,6 +109,12 @@ io.on('connection', (socket) => {
     
     if (!game) {
       socket.emit('error', 'Room not found');
+      return;
+    }
+    
+    // Check if player is the host
+    if (!game.isHost(socket.id)) {
+      socket.emit('error', 'Only the host can start the game');
       return;
     }
     
@@ -217,6 +242,13 @@ io.on('connection', (socket) => {
     }
     
     const game = activeGames[roomCode];
+    
+    // Check if player is the host
+    if (!game.isHost(socket.id)) {
+      socket.emit('error', 'Only the host can start a new game');
+      return;
+    }
+    
     const playerIds = game.getPlayers().map(p => p.id);
     const playerNicknames = game.getPlayers().map(p => p.nickname);
     
@@ -231,24 +263,49 @@ io.on('connection', (socket) => {
       newGame.addPlayer(id, playerNicknames[index]);
     });
     
+    // Set the original host as the host for the new game
+    newGame.hostId = game.hostId;
+    
     // Tell all clients in the room that game has been reset
     io.to(roomCode).emit('gameReset');
     
     // Send updated player list to all clients
     io.to(roomCode).emit('updatePlayers', {
       players: newGame.getPlayers(),
-      canStart: newGame.canStart()
+      canStart: newGame.canStart(),
+      hostId: newGame.getHostId()
     });
     
     console.log(`New game created in room ${roomCode}, notified ${playerIds.length} players`);
   });
-  
+
+  // Handle event when host continues to next round
+  socket.on('continueToNextRound', ({ roomCode }) => {
+    roomCode = roomCode.toUpperCase();
+    const game = activeGames[roomCode];
+    
+    if (!game) return;
+    
+    // Verify this is from the host
+    if (!game.isHost(socket.id)) {
+      socket.emit('error', 'Only the host can continue to the next round');
+      return;
+    }
+    
+    // Broadcast to all players that they should continue to the next round
+    io.to(roomCode).emit('continueToNextRound');
+  });
+
   // Handle disconnection
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
     
     if (currentRoomCode && activeGames[currentRoomCode]) {
       const game = activeGames[currentRoomCode];
+      
+      // Check if the disconnecting player is the host
+      const wasHost = game.isHost(socket.id);
+      
       game.removePlayer(socket.id);
       
       // If room is empty, remove it
@@ -257,10 +314,16 @@ io.on('connection', (socket) => {
         return;
       }
       
+      // Update host if needed
+      const hostChanged = game.updateHostIfNeeded(socket.id);
+      
       // Notify remaining players
       io.to(currentRoomCode).emit('playerLeft', {
         players: game.getPlayers(),
-        canStart: game.canStart()
+        canStart: game.canStart(),
+        hostId: game.getHostId(),
+        hostChanged: hostChanged,
+        previousHostId: wasHost ? socket.id : null
       });
       
       // If game was in progress, handle accordingly

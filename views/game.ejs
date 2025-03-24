@@ -195,6 +195,16 @@
       background-color: var(--secondary-color);
     }
     
+    .waiting-message {
+      display: inline-block;
+      background-color: #f5f5f5;
+      padding: 0.75rem 1.5rem;
+      border-radius: 4px;
+      margin-top: 1rem;
+      color: #666;
+      font-style: italic;
+    }
+
     /* Player scores display */
     .player-score-display {
       margin-bottom: 1rem;
@@ -290,6 +300,22 @@
       text-align: center;
       font-weight: 500;
     }
+
+    /* Host indicator styles */
+    .host-indicator {
+      background-color: #ffd700;
+      color: #333;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 0.7rem;
+      margin-left: 6px;
+      font-weight: bold;
+    }
+    
+    .player-item.host {
+      background-color: #fffde7;
+      border-left: 3px solid #ffd700;
+    }
   </style>
 </head>
 <body>
@@ -378,6 +404,7 @@
     const nickname = '<%= nickname %>';
     let currentPlayerId = '';
     let currentRoomCode = roomCode;
+    let isHost = false; // Track if current player is host
     let pinkLarkspurAbilityInProgress = false;
     let snapdragonAbilityInProgress = false;
     let snapdragonMovesUsed = 0;  // Track how many Snapdragon moves have been used
@@ -421,14 +448,38 @@
       }
     });
     
-    socket.on('updatePlayers', ({ players, canStart }) => {
-      console.log('Received updatePlayers event. Players:', players);
-      updatePlayersList(players);
+    socket.on('updatePlayers', ({ players, canStart, hostId }) => {
+      console.log('Received updatePlayers event. Players:', players, 'hostId:', hostId);
+      updatePlayersList(players, hostId);
+      
+      // Track if current player is host
+      isHost = hostId === socket.id;
+      console.log('Am I host?', isHost ? 'YES' : 'NO');
       
       if (startGameBtn) {
-        startGameBtn.disabled = !canStart;
+        // Only enable the button for the host and if there are enough players
+        startGameBtn.disabled = !canStart || !isHost;
+        
+        // Show a message if player is not host
+        const hostMessage = document.getElementById('hostMessage') || createHostMessage();
+        hostMessage.style.display = isHost ? 'none' : 'block';
       }
     });
+    
+    // Create and insert host message
+    function createHostMessage() {
+      const hostMessage = document.createElement('p');
+      hostMessage.id = 'hostMessage';
+      hostMessage.classList.add('lobby-help');
+      hostMessage.textContent = 'Only the room host can start the game';
+      
+      // Insert after the start game button
+      if (startGameBtn && startGameBtn.parentNode) {
+        startGameBtn.parentNode.insertBefore(hostMessage, startGameBtn.nextSibling);
+      }
+      
+      return hostMessage;
+    }
     
     socket.on('gameStarted', () => {
       console.log('Game has started!');
@@ -449,6 +500,31 @@
     socket.on('error', (message) => {
       console.error('Socket error:', message);
       alert(message);
+    });
+    
+    socket.on('playerLeft', ({ players, canStart, hostId, hostChanged }) => {
+      console.log('Player left, remaining players:', players, 'host:', hostId);
+      updatePlayersList(players, hostId);
+      
+      // Update host status
+      isHost = hostId === socket.id;
+      
+      if (startGameBtn) {
+        startGameBtn.disabled = !canStart || !isHost;
+      }
+      
+      // Notify if host changed
+      if (hostChanged && isHost) {
+        const notification = document.createElement('div');
+        notification.classList.add('notification');
+        notification.textContent = 'You are now the room host';
+        document.body.appendChild(notification);
+        
+        // Remove notification after 5 seconds
+        setTimeout(() => {
+          notification.remove();
+        }, 5000);
+      }
     });
     
     // Game control event handlers
@@ -485,10 +561,10 @@
     }
     
     // Helper Functions
-    function updatePlayersList(players) {
+    function updatePlayersList(players, hostId) {
       if (!playersList) return;
       
-      console.log('Updating players list with:', players);
+      console.log('Updating players list with:', players, 'host:', hostId);
       playersList.innerHTML = '';
       
       players.forEach(player => {
@@ -500,7 +576,17 @@
           currentPlayerId = player.id;
         }
         
-        playerItem.textContent = player.nickname;
+        // Mark host player
+        if (player.id === hostId) {
+          playerItem.classList.add('host');
+        }
+        
+        // Player name with host tag if applicable
+        playerItem.innerHTML = `
+          ${player.nickname}
+          ${player.id === hostId ? '<span class="host-indicator">HOST</span>' : ''}
+        `;
+        
         playersList.appendChild(playerItem);
       });
     }
@@ -969,8 +1055,23 @@
         existingResults.remove();
       }
       
+      // Only show new game button to host
       if (newGameBtn) {
-        newGameBtn.style.display = 'block';
+        newGameBtn.style.display = isHost ? 'block' : 'none';
+        
+        // Add info message for non-hosts
+        let hostInfoMsg = document.getElementById('gameOverHostMsg');
+        if (!isHost) {
+          if (!hostInfoMsg) {
+            hostInfoMsg = document.createElement('p');
+            hostInfoMsg.id = 'gameOverHostMsg';
+            hostInfoMsg.classList.add('host-info-message');
+            hostInfoMsg.textContent = 'Waiting for host to start a new game...';
+            gameArea.appendChild(hostInfoMsg);
+          }
+        } else if (hostInfoMsg) {
+          hostInfoMsg.remove();
+        }
       }
       
       // Add results to game area
@@ -990,6 +1091,12 @@
       // Hide game over elements
       if (newGameBtn) {
         newGameBtn.style.display = 'none';
+      }
+      
+      // Remove host info message
+      const hostInfoMsg = document.getElementById('gameOverHostMsg');
+      if (hostInfoMsg) {
+        hostInfoMsg.remove();
       }
       
       // Remove results container
@@ -1547,32 +1654,48 @@
         document.body.appendChild(transitionOverlay);
       }
       
+      // Different content based on host status
+      const actionContent = isHost 
+        ? `<div class="continue-button" id="continueToNextRoundBtn">Continue to Next Round</div>`
+        : `<div class="waiting-message">Waiting for host to start the next round...</div>`;
+      
       transitionOverlay.innerHTML = `
         <div class="transition-content">
           <h2>Round ${gameRound - 1} Complete!</h2>
           <p>Moving to Round ${gameRound} of 3</p>
-          <div class="continue-button">Continue to Next Round</div>
+          ${actionContent}
         </div>
       `;
       
       // Show the overlay
       transitionOverlay.style.display = 'flex';
       
-      // Add click handler to continue button
-      document.querySelector('#roundTransition .continue-button').addEventListener('click', () => {
-        transitionOverlay.style.display = 'none';
-      });
+      // Add click handler to continue button (only for host)
+      if (isHost) {
+        document.getElementById('continueToNextRoundBtn').addEventListener('click', () => {
+          // Send event to server that host clicked continue
+          socket.emit('continueToNextRound', { roomCode });
+          transitionOverlay.style.display = 'none';
+        });
+      }
       
-      // Auto-hide after 5 seconds
-      setTimeout(() => {
-        transitionOverlay.style.display = 'none';
-      }, 5000);
+      // No auto-hide timer - only dismissible by host action
     }
     
     // Listen for round transitions
     socket.on('roundComplete', ({ gameRound }) => {
       console.log('Round complete, moving to round:', gameRound);
       showRoundTransition(gameRound);
+    });
+    
+    // Listen for continue to next round (triggered by host)
+    socket.on('continueToNextRound', () => {
+      console.log('Host continued to next round');
+      // Hide the transition overlay for all players
+      const transitionOverlay = document.getElementById('roundTransition');
+      if (transitionOverlay) {
+        transitionOverlay.style.display = 'none';
+      }
     });
   </script>
 </body>
