@@ -620,6 +620,19 @@
     function updateActiveCards(activeCards, phase, isCurrentPlayer, isReceivingPlayer) {
       if (!activeCardsArea) return;
       
+      // Find the parent game-section that contains the active cards area
+      const activeCardsSection = activeCardsArea.closest('.game-section');
+      
+      // Hide the entire section during scoring or game over phases
+      if (activeCardsSection) {
+        if (phase === 'scoring' || phase === 'gameOver') {
+          activeCardsSection.style.display = 'none';
+          return; // Exit early, no need to update content for a hidden section
+        } else {
+          activeCardsSection.style.display = 'block';
+        }
+      }
+      
       console.log('Updating active cards:', activeCards);
       activeCardsArea.innerHTML = '';
       
