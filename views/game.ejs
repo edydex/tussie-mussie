@@ -689,39 +689,21 @@
       // Clear current cards
       playerCards.innerHTML = '';
       
-      // Combine bouquet and keepsakes but keep track of their type
-      const allCards = [
-        ...playerData.bouquet.map(card => ({ ...card, type: 'bouquet', faceUp: true })),
-        ...playerData.keepsakes.map(card => ({ ...card, type: 'keepsakes', faceUp:true }))
-      ];
-      
-      // Group cards first by type (bouquet and keepsakes) then sort within groups
-      const bouquetCards = allCards.filter(card => card.type === 'bouquet');
-      const keepsakeCards = allCards.filter(card => card.type === 'keepsakes');
-      
-      // Sort cards within their groups based on previous positions
-      bouquetCards.sort((a, b) => {
+      // Sort cards based on previous positions if available
+      const sortedCards = [...playerData.cards].sort((a, b) => {
         const posA = cardPositions.has(a.id) ? cardPositions.get(a.id).index : 999;
         const posB = cardPositions.has(b.id) ? cardPositions.get(b.id).index : 999;
         return posA - posB;
       });
-      
-      keepsakeCards.sort((a, b) => {
-        const posA = cardPositions.has(a.id) ? cardPositions.get(a.id).index : 999;
-        const posB = cardPositions.has(b.id) ? cardPositions.get(b.id).index : 999;
-        return posA - posB;
-      });
-      
-      // Join the cards with bouquet cards first, then keepsakes
-      const sortedCards = [...bouquetCards, ...keepsakeCards];
       
       // Create card elements
-      sortedCards.forEach((card, index) => {
+      sortedCards.forEach((card) => {
         const cardElement = createCardElement(card);
         cardElement.classList.add('player-card');
+        cardElement.dataset.location = card.location;
         
         // Add a class for keepsake cards to apply the shifted positioning
-        if (card.type === 'keepsakes') {
+        if (card.location === 'keepsakes') {
           cardElement.classList.add('keepsake-card');
           
           // Add a small label to indicate keepsake
@@ -747,23 +729,11 @@
           });
         }
         
-        // Add drag-drop functionality for scoring phase
-        if (card.canMove) {
-          cardElement.classList.add('movable');
-          cardElement.setAttribute('draggable', true);
-          cardElement.addEventListener('dragstart', (e) => {
-            e.dataTransfer.setData('text/plain', JSON.stringify({
-              cardId: card.id,
-              source: card.type
-            }));
-          });
-        }
-        
         // Apply smooth animation for cards that move between bouquet and keepsakes
         const prevPos = cardPositions.get(card.id);
         if (prevPos) {
-          const isMovedCard = (prevPos.isKeepsake && card.type === 'bouquet') || 
-                             (!prevPos.isKeepsake && card.type === 'keepsakes');
+          const isMovedCard = (prevPos.isKeepsake && card.location === 'bouquet') || 
+                             (!prevPos.isKeepsake && card.location === 'keepsakes');
           
           if (isMovedCard) {
             cardElement.style.transition = 'transform 0.5s ease-in-out, opacity 0.3s';
@@ -779,7 +749,7 @@
         playerCards.appendChild(cardElement);
       });
       
-      // Update player score display - show both current round and total scores
+      // Update player score display
       const playerScoreDisplay = document.getElementById('playerScoreDisplay');
       if (playerScoreDisplay && playerData.score !== undefined) {
         playerScoreDisplay.style.display = 'block';
@@ -809,7 +779,7 @@
         nameElement.textContent = player.nickname;
         opponentElement.appendChild(nameElement);
         
-        // Add opponent scores - both current round and total
+        // Add opponent scores
         if (player.score !== undefined) {
           const scoreContainer = document.createElement('div');
           scoreContainer.classList.add('opponent-scores');
@@ -839,18 +809,12 @@
         const cardsElement = document.createElement('div');
         cardsElement.classList.add('opponent-cards');
         
-        // Have Bouqets and Keepsakes in the same line
-        const allCards = [
-          ...player.bouquet.map(card => ({ ...card, type: 'bouquet' })),
-          ...player.keepsakes.map(card => ({ ...card, type: 'keepsakes', faceUp: true })) // change to "faceUp: false" to  hide opponents' keepsakes 
-        ];
+        // Sort cards to maintain order (if we had a way to track original order)
+        const sortedCards = [...player.cards];
         
-        // Sort cards (bouquet first, then keepsakes)
-        allCards.sort((a, b) => a.type === 'bouquet' ? -1 : 1);
-        
-        allCards.forEach(card => {
+        sortedCards.forEach(card => {
           const cardElement = createCardElement(card, true);
-          if (card.type === 'keepsakes') {
+          if (card.location === 'keepsakes') {
             cardElement.classList.add('keepsake-card');
           }
           cardsElement.appendChild(cardElement);

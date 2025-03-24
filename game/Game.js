@@ -38,8 +38,7 @@ class Player {
   constructor(id, nickname) {
     this.id = id;
     this.nickname = nickname;
-    this.bouquet = []; // face-up cards
-    this.keepsakes = []; // face-down cards
+    this.cards = []; // Single array for all cards
     this.score = 0; // Current round score
     this.totalScore = 0; // Accumulated score across rounds
     this.doneScoring = false;
@@ -52,54 +51,55 @@ class Player {
     
     if (location === 'bouquet') {
       card.faceUp = true;
-      this.bouquet.push(card);
-    } else if (location === 'keepsakes') {
-      // Keep the card's current face-up/face-down state for keepsakes
-      this.keepsakes.push(card);
     }
+    
+    this.cards.push(card);
   }
 
-  removeCard(cardId, location) {
-    if (location === 'bouquet') {
-      const index = this.bouquet.findIndex(c => c.id === cardId);
-      if (index !== -1) {
-        return this.bouquet.splice(index, 1)[0];
-      }
-    } else if (location === 'keepsakes') {
-      const index = this.keepsakes.findIndex(c => c.id === cardId);
-      if (index !== -1) {
-        return this.keepsakes.splice(index, 1)[0];
-      }
+  removeCard(cardId) {
+    const index = this.cards.findIndex(c => c.id === cardId);
+    if (index !== -1) {
+      return this.cards.splice(index, 1)[0];
     }
     return null;
   }
 
-  moveCard(cardId, fromLocation, toLocation) {
-    const card = this.removeCard(cardId, fromLocation);
+  moveCard(cardId, newLocation) {
+    const card = this.cards.find(c => c.id === cardId);
     if (card) {
-      this.addCard(card, toLocation);
+      card.setLocation(newLocation);
+      
+      // If moving to bouquet, set face up
+      if (newLocation === 'bouquet') {
+        card.faceUp = true;
+      }
+      
       return true;
     }
     return false;
   }
   
+  // Helper methods to get filtered cards
+  getBouquet() {
+    return this.cards.filter(card => card.location === 'bouquet');
+  }
+  
+  getKeepsakes() {
+    return this.cards.filter(card => card.location === 'keepsakes');
+  }
+  
   getAllCards() {
-    return [...this.bouquet, ...this.keepsakes];
+    return this.cards;
   }
 
   calculateScore() {
     let score = 0;
     
     // Base heart score
-    const cards = this.getAllCards();
-    score += cards.reduce((sum, card) => sum + card.hearts, 0);
+    score += this.cards.reduce((sum, card) => sum + card.hearts, 0);
     
     // Additional scores from card effects
-    for (const card of this.bouquet) {
-      score += card.effect(this);
-    }
-    
-    for (const card of this.keepsakes) {
+    for (const card of this.cards) {
       score += card.effect(this);
     }
     
@@ -116,8 +116,7 @@ class Player {
   
   // Reset cards for a new round but keep accumulated score
   resetForNewRound() {
-    this.bouquet = [];
-    this.keepsakes = [];
+    this.cards = [];
     this.score = 0;
     this.doneScoring = false;
   }
@@ -169,7 +168,7 @@ class Game {
       
       new Card("amaryllis", "Amaryllis", "red", 0, 
                (player) => {
-                 return player.bouquet.length;
+                 return player.getBouquet().length;
                }, 
                "+1 point for each card in your bouquet", 
                "I am determined"),
@@ -190,7 +189,7 @@ class Game {
                
       new Card("peony", "Peony", "pink", 1, 
                (player) => {
-                 return player.bouquet.length === 2 ? 2 : 0;
+                 return player.getBouquet().length === 2 ? 2 : 0;
                }, 
                "+2 points if you have exactly two cards in your bouquet", 
                "I am bashful"),
@@ -245,14 +244,16 @@ class Game {
       new Card("honeysuckle", "Honeysuckle", "yellow", 1, 
                (player) => {
                  let points = 0;
-                 const bouquetIndex = player.bouquet.findIndex(c => c.id === "honeysuckle");
+                 // Use getBouquet() instead of accessing bouquet directly
+                 const bouquet = player.getBouquet();
+                 const bouquetIndex = bouquet.findIndex(c => c.id === "honeysuckle");
                  
                  if (bouquetIndex !== -1) {
                    if (bouquetIndex > 0) {
                      points++;
                    }
                    
-                   if (bouquetIndex < player.bouquet.length - 1) {
+                   if (bouquetIndex < bouquet.length - 1) {
                      points++;
                    }
                  }
@@ -279,7 +280,7 @@ class Game {
       // White cards
       new Card("gardenia", "Gardenia", "white", 0, 
                (player) => {
-                 return player.keepsakes.length;
+                 return player.getKeepsakes().length;
                }, 
                "+1 point for each of your keepsakes", 
                "Let's keep a secret"),
@@ -415,7 +416,7 @@ class Game {
     
     // Log current card counts for each player
     this.players.forEach((p, i) => {
-      console.log(`Player ${i} (${p.nickname}): bouquet=${p.bouquet.length}, keepsakes=${p.keepsakes.length}, total=${p.bouquet.length + p.keepsakes.length}`);
+      console.log(`Player ${i} (${p.nickname}): bouquet=${p.getBouquet().length}, keepsakes=${p.getKeepsakes().length}, total=${p.getAllCards().length}`);
     });
     
     // For exact control in a 2-player game:
@@ -431,7 +432,7 @@ class Game {
     // or if we've completed the required number of rounds
     if (this.players.length > 2) {
       const allPlayersHaveMaxCards = this.players.every(
-        p => (p.bouquet.length + p.keepsakes.length) >= cardsPerPlayer
+        p => (p.getBouquet().length + p.getKeepsakes().length) >= cardsPerPlayer
       );
       
       if (this.round >= 1 || allPlayersHaveMaxCards) {
@@ -519,30 +520,13 @@ class Game {
     const player = this.players.find(p => p.id === playerId);
     if (!player) return false;
     
-    // Find the card in the player's collection
-    let card = null;
-    let currentLocation = null;
+    // Find the card
+    const card = player.cards.find(c => c.id === cardId);
     
-    // Check bouquet
-    const bouquetIndex = player.bouquet.findIndex(c => c.id === cardId);
-    if (bouquetIndex !== -1) {
-      card = player.bouquet[bouquetIndex];
-      currentLocation = 'bouquet';
-    }
+    if (!card || card.location === location) return false;
     
-    // Check keepsakes
-    if (!card) {
-      const keepsakeIndex = player.keepsakes.findIndex(c => c.id === cardId);
-      if (keepsakeIndex !== -1) {
-        card = player.keepsakes[keepsakeIndex];
-        currentLocation = 'keepsakes';
-      }
-    }
-    
-    if (!card || currentLocation === location) return false;
-    
-    // Move the card
-    return player.moveCard(cardId, currentLocation, location);
+    // Update the card's location
+    return player.moveCard(cardId, location);
   }
 
   useCardAbility(playerId, cardId, targetCardId) {
@@ -552,8 +536,7 @@ class Game {
     if (!player) return false;
     
     // Find the card with the ability
-    const allCards = [...player.bouquet, ...player.keepsakes];
-    const card = allCards.find(c => c.id === cardId);
+    const card = player.cards.find(c => c.id === cardId);
     
     if (!card) return false;
     
@@ -594,33 +577,19 @@ class Game {
           }
           
           // Find the target card to replace
-          let targetCard = null;
-          let targetLocation = null;
+          const targetCard = player.cards.find(c => c.id === targetPlayerCardId);
           
-          for (const c of player.bouquet) {
-            if (c.id === targetPlayerCardId) {
-              targetCard = c;
-              targetLocation = 'bouquet';
-              break;
-            }
-          }
-          
-          if (!targetCard) {
-            for (const c of player.keepsakes) {
-              if (c.id === targetPlayerCardId) {
-                targetCard = c;
-                targetLocation = 'keepsakes';
-                break;
-              }
-            }
-          }
-          
-          if (targetCard && targetLocation && player.drawnCards && player.drawnCards.length === 2) {
+          if (targetCard && player.drawnCards && player.drawnCards.length === 2) {
+            // Get the location from the target card
+            const location = targetCard.location;
+            
             // Remove the target card
-            player.removeCard(targetPlayerCardId, targetLocation);
+            player.removeCard(targetPlayerCardId);
             
             // Add the selected drawn card to the same location
-            player.addCard(player.drawnCards[drawnCardIndex], targetLocation);
+            const selectedCard = player.drawnCards[drawnCardIndex];
+            selectedCard.setLocation(location);
+            player.addCard(selectedCard, location);
             
             // Put the other drawn card back in the deck
             this.deck.push(player.drawnCards[drawnCardIndex === 0 ? 1 : 0]);
@@ -649,31 +618,12 @@ class Game {
         // Allow player to move up to 2 cards between bouquet and keepsakes
         if (targetCardId) {
           // Find the target card
-          let targetCard = null;
-          let targetLocation = null;
+          const targetCard = player.cards.find(c => c.id === targetCardId);
           
-          for (const c of player.bouquet) {
-            if (c.id === targetCardId) {
-              targetCard = c;
-              targetLocation = 'bouquet';
-              break;
-            }
-          }
-          
-          if (!targetCard) {
-            for (const c of player.keepsakes) {
-              if (c.id === targetCardId) {
-                targetCard = c;
-                targetLocation = 'keepsakes';
-                break;
-              }
-            }
-          }
-          
-          if (targetCard && targetLocation) {
+          if (targetCard) {
             // Move the card to the opposite location
-            const newLocation = targetLocation === 'bouquet' ? 'keepsakes' : 'bouquet';
-            return player.moveCard(targetCardId, targetLocation, newLocation);
+            const newLocation = targetCard.location === 'bouquet' ? 'keepsakes' : 'bouquet';
+            return player.moveCard(targetCardId, newLocation);
           }
         }
         break;
@@ -682,17 +632,11 @@ class Game {
         // Player must discard one of their other cards
         if (targetCardId && targetCardId !== 'marigold') {
           // Find the target card
-          let targetLocation = null;
+          const targetCard = player.cards.find(c => c.id === targetCardId);
           
-          if (player.bouquet.some(c => c.id === targetCardId)) {
-            targetLocation = 'bouquet';
-          } else if (player.keepsakes.some(c => c.id === targetCardId)) {
-            targetLocation = 'keepsakes';
-          }
-          
-          if (targetLocation) {
+          if (targetCard) {
             // Remove the card
-            player.removeCard(targetCardId, targetLocation);
+            player.removeCard(targetCardId);
             // Mark marigold ability as used
             card.abilityUsed = true;
             return true;
@@ -714,7 +658,7 @@ class Game {
     const player = this.players.find(p => p.id === playerId);
     if (player) {
       // Check if player has any marigold card whose ability has not been used
-      const hasUnusedMarigold = [...player.bouquet, ...player.keepsakes].some(
+      const hasUnusedMarigold = player.cards.some(
         card => card.id === 'marigold' && !card.abilityUsed
       );
       if (hasUnusedMarigold) return false;
@@ -731,8 +675,10 @@ class Game {
   finalizeScoring() {
     // Before scoring, reveal all keepsake cards
     this.players.forEach(player => {
-      player.keepsakes.forEach(card => {
-        card.faceUp = true;
+      player.cards.forEach(card => {
+        if (card.location === 'keepsakes') {
+          card.faceUp = true;
+        }
       });
     });
     
@@ -795,12 +741,11 @@ class Game {
       players: this.players.map(p => ({
         id: p.id,
         nickname: p.nickname,
-        bouquet: p.bouquet,
-        keepsakes: p.keepsakes.map(c => ({ 
+        cards: p.cards.map(c => ({ 
           ...c, 
           // Only hide other players' keepsakes during gameplay
           // Players can see their own keepsakes at all times
-          faceUp: revealKeepsakes || c.owner === p.id
+          faceUp: revealKeepsakes || c.owner === p.id || c.location === 'bouquet'
         })),
         score: p.score, // Current round score
         totalScore: p.totalScore, // Accumulated score across rounds
