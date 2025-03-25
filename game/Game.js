@@ -56,6 +56,16 @@ class Player {
     this.cards.push(card);
   }
 
+  addCardAtIndex(card, location, index) {
+    card.setOwner(this.id);
+    card.setLocation(location);
+    
+    if (location === 'bouquet') {
+      card.faceUp = true;
+    }
+    this.cards.splice(index, 0, card);
+  }
+
   removeCard(cardId) {
     const index = this.cards.findIndex(c => c.id === cardId);
     if (index !== -1) {
@@ -560,7 +570,7 @@ class Game {
         if (!targetCardId && this.deck.length >= 2) {
           const drawnCards = [this.deck.pop(), this.deck.pop()];
           
-          // Add this line to make the drawn cards face-up
+          // Force the larkspur cards to be face-up
           drawnCards.forEach(card => card.faceUp = true);
           
           // Store drawn cards on the player object for later use
@@ -587,6 +597,9 @@ class Game {
           const targetCard = player.cards.find(c => c.id === targetPlayerCardId);
           
           if (targetCard && player.drawnCards && player.drawnCards.length === 2) {
+            // store index of targetCard
+            const targetCardOrderIndex = player.cards.indexOf(targetCard);
+
             // Get the location from the target card
             const location = targetCard.location;
             
@@ -596,7 +609,7 @@ class Game {
             // Add the selected drawn card to the same location
             const selectedCard = player.drawnCards[drawnCardIndex];
             selectedCard.setLocation(location);
-            player.addCard(selectedCard, location);
+            player.addCardAtIndex(selectedCard, location, targetCardOrderIndex);
             
             // Put the other drawn card back in the deck
             this.deck.push(player.drawnCards[drawnCardIndex === 0 ? 1 : 0]);

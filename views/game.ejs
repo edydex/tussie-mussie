@@ -771,32 +771,11 @@
     function updatePlayerCards(playerData) {
       if (!playerCards) return;
       
-      // Save current card positions before clearing the container
-      const allCurrentCards = document.querySelectorAll('.player-card');
-      allCurrentCards.forEach((cardElement) => {
-        if (cardElement.dataset.cardId) {
-          const rect = cardElement.getBoundingClientRect();
-          cardPositions.set(cardElement.dataset.cardId, {
-            index: Array.from(playerCards.children).indexOf(cardElement),
-            left: rect.left,
-            top: rect.top,
-            isKeepsake: cardElement.classList.contains('keepsake-card')
-          });
-        }
-      });
-      
       // Clear current cards
       playerCards.innerHTML = '';
       
-      // Sort cards based on previous positions if available
-      const sortedCards = [...playerData.cards].sort((a, b) => {
-        const posA = cardPositions.has(a.id) ? cardPositions.get(a.id).index : 999;
-        const posB = cardPositions.has(b.id) ? cardPositions.get(b.id).index : 999;
-        return posA - posB;
-      });
-      
       // Create card elements
-      sortedCards.forEach((card) => {
+      playerData.cards.forEach((card) => {
         const cardElement = createCardElement(card);
         cardElement.classList.add('player-card');
         cardElement.dataset.location = card.location;
