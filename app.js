@@ -23,6 +23,10 @@ app.use(express.urlencoded({ extended: true }));
 const activeGames = {};
 // Track room creators to ensure they become hosts
 const roomCreators = {};
+// Track room activity timestamps
+const roomLastActivity = {};
+// Configure room timeout (30 minutes in milliseconds)
+const ROOM_INACTIVE_TIMEOUT = 30 * 60 * 1000;
 
 // Routes
 app.get('/', (req, res) => {
@@ -93,6 +97,9 @@ io.on('connection', (socket) => {
     currentRoomCode = roomCode;
     socket.join(roomCode);
     console.log(`Socket ${socket.id} joined room: ${roomCode}`);
+    
+    // Update room activity timestamp
+    updateRoomActivity(roomCode);
     
     // Send updated player list to all clients in the room
     io.to(roomCode).emit('updatePlayers', {
@@ -314,14 +321,17 @@ io.on('connection', (socket) => {
       
       game.removePlayer(socket.id);
       
-      // If room is empty, remove it
+      // If room is empty, remove it and clean up associated resources
       if (game.getPlayers().length === 0) {
-        delete activeGames[currentRoomCode];
+        cleanupRoom(currentRoomCode);
         return;
       }
       
       // Update host if needed
       const hostChanged = game.updateHostIfNeeded(socket.id);
+      
+      // Update room activity timestamp
+      updateRoomActivity(currentRoomCode);
       
       // Notify remaining players
       io.to(currentRoomCode).emit('playerLeft', {
@@ -344,15 +354,70 @@ io.on('connection', (socket) => {
   });
 });
 
+// Function to update room activity timestamp
+function updateRoomActivity(roomCode) {
+  roomLastActivity[roomCode] = Date.now();
+}
+
+// Function to clean up a room and all associated resources
+function cleanupRoom(roomCode) {
+  console.log(`Cleaning up room: ${roomCode}`);
+  
+  // Clear any timers associated with the room
+  if (activeGames[roomCode]) {
+    if (activeGames[roomCode].turnTimer) {
+      clearTimeout(activeGames[roomCode].turnTimer);
+    }
+    if (activeGames[roomCode].scoringTimer) {
+      clearTimeout(activeGames[roomCode].scoringTimer);
+    }
+  }
+  
+  // Delete the game instance
+  delete activeGames[roomCode];
+  
+  // Clean up room creators entry
+  delete roomCreators[roomCode];
+  
+  // Clean up activity timestamp
+  delete roomLastActivity[roomCode];
+  
+  console.log(`Room ${roomCode} has been deleted`);
+}
+
+// Periodic cleanup of inactive rooms (runs every 10 minutes)
+setInterval(() => {
+  console.log('Running periodic cleanup of inactive rooms');
+  const now = Date.now();
+  
+  for (const roomCode in roomLastActivity) {
+    const lastActivity = roomLastActivity[roomCode];
+    if (now - lastActivity > ROOM_INACTIVE_TIMEOUT) {
+      console.log(`Room ${roomCode} has been inactive for ${Math.floor((now - lastActivity) / 60000)} minutes`);
+      
+      // Notify any connected players that the room is being closed due to inactivity
+      if (activeGames[roomCode]) {
+        io.to(roomCode).emit('error', 'Room closed due to inactivity');
+      }
+      
+      // Clean up the room
+      cleanupRoom(roomCode);
+    }
+  }
+}, 10 * 60 * 1000); // Check every 10 minutes
+
 // Update all clients in a room with the current game state
 function updateGameState(roomCode) {
   const game = activeGames[roomCode];
   if (!game) return;
   
+  // Update room activity timestamp when game state changes
+  updateRoomActivity(roomCode);
+  
   io.to(roomCode).emit('updateGameState', game.getGameState());
 }
 
-// Start turn timer
+// Start turn timer with improved cleanup
 function startTurnTimer(roomCode) {
   const game = activeGames[roomCode];
   if (!game) return;
@@ -362,8 +427,14 @@ function startTurnTimer(roomCode) {
     clearTimeout(game.turnTimer);
   }
   
+  // Update room activity timestamp
+  updateRoomActivity(roomCode);
+  
   // Set new timer (30 seconds)
   game.turnTimer = setTimeout(() => {
+    // Check if room still exists before proceeding
+    if (!activeGames[roomCode]) return;
+    
     console.log('Turn time expired for room:', roomCode);
     
     // Auto-complete the turn
