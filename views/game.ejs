@@ -2024,12 +2024,11 @@
       
       // Touch events for mobile
       cardElement.addEventListener('touchstart', (e) => {
+        // Prevent text selection immediately
+        e.preventDefault();
+        
         longPressTriggered = false;
         longPressTarget = cardElement;
-        
-        // Temporarily disable text selection on this element
-        cardElement.style.webkitUserSelect = 'none';
-        cardElement.style.userSelect = 'none';
         
         longPressTimer = setTimeout(() => {
           longPressTriggered = true;
@@ -2043,10 +2042,6 @@
           longPressTimer = null;
         }
         
-        // Re-enable text selection
-        cardElement.style.webkitUserSelect = '';
-        cardElement.style.userSelect = '';
-        
         // If long press was triggered, prevent the click/tap from propagating
         if (longPressTriggered) {
           e.preventDefault();
@@ -2057,14 +2052,11 @@
         longPressTarget = null;
       });
       
-      cardElement.addEventListener('touchmove', () => {
+      cardElement.addEventListener('touchmove', (e) => {
         if (longPressTimer) {
           clearTimeout(longPressTimer);
           longPressTimer = null;
         }
-        // Re-enable text selection since user is moving
-        cardElement.style.webkitUserSelect = '';
-        cardElement.style.userSelect = '';
         longPressTriggered = false;
       });
       
