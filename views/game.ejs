@@ -442,30 +442,14 @@
       }
     }
     
-    /* Card long-press hint */
+    /* Card long-press hint - removed eye icon, keep functionality */
     .card.can-preview {
       cursor: pointer;
       position: relative;
     }
     
-    .card.can-preview::after {
-      content: "👁️";
-      position: absolute;
-      bottom: 4px;
-      right: 4px;
-      font-size: 0.8rem;
-      opacity: 0.4;
-      pointer-events: none;
-    }
-    
     .card.can-preview:active {
       transform: scale(0.98);
-    }
-    
-    @media (max-width: 768px) {
-      .card.can-preview::after {
-        font-size: 0.7rem;
-      }
     }
   </style>
 </head>
@@ -651,13 +635,26 @@
       // Auto-join room if nickname is provided
       if (nickname) {
         console.log('Auto-joining room with nickname:', nickname);
-        socket.emit('joinRoom', { roomCode, nickname });
+        
+        // Try to get reconnect token from localStorage
+        const reconnectToken = localStorage.getItem(`tussie_${roomCode}_${nickname}`);
+        
+        if (reconnectToken) {
+          console.log('Found reconnect token, attempting to reconnect');
+          socket.emit('joinRoom', { roomCode, nickname, reconnectToken });
+        } else {
+          console.log('No reconnect token found, joining as new player');
+          socket.emit('joinRoom', { roomCode, nickname });
+        }
       }
     });
     
     socket.on('updatePlayers', ({ players, canStart, hostId }) => {
       console.log('Received updatePlayers event. Players:', players, 'hostId:', hostId);
       updatePlayersList(players, hostId);
+      
+      // Store session info in localStorage for reconnection
+      localStorage.setItem(`tussie_${roomCode}_${nickname}`, socket.id);
       
       // Track if current player is host
       isHost = hostId === socket.id;
@@ -671,6 +668,72 @@
         const hostMessage = document.getElementById('hostMessage') || createHostMessage();
         hostMessage.style.display = isHost ? 'none' : 'block';
       }
+    });
+    
+    // Handle successful reconnection
+    socket.on('reconnected', ({ message }) => {
+      console.log('Reconnected successfully:', message);
+      
+      // Show notification
+      const notification = document.createElement('div');
+      notification.classList.add('notification', 'success');
+      notification.textContent = message;
+      notification.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #4CAF50; color: white; padding: 1rem 2rem; border-radius: 8px; z-index: 10000; box-shadow: 0 4px 6px rgba(0,0,0,0.2);';
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        notification.style.transition = 'opacity 0.3s';
+        notification.style.opacity = '0';
+        setTimeout(() => notification.remove(), 300);
+      }, 3000);
+    });
+    
+    // Handle joining as spectator
+    socket.on('joinedAsSpectator', ({ message }) => {
+      console.log('Joined as spectator:', message);
+      
+      // Hide start game button (spectators can't start games)
+      if (startGameBtn) {
+        startGameBtn.style.display = 'none';
+      }
+      
+      // Show spectator notification
+      const spectatorBanner = document.createElement('div');
+      spectatorBanner.id = 'spectatorBanner';
+      spectatorBanner.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem; text-align: center; z-index: 9999; box-shadow: 0 2px 8px rgba(0,0,0,0.2);';
+      spectatorBanner.innerHTML = `
+        <strong>👀 Spectating</strong><br>
+        <span style="font-size: 0.9em;">You're watching this game. You'll be able to join the next one!</span>
+      `;
+      document.body.insertBefore(spectatorBanner, document.body.firstChild);
+      
+      // Also add margin to body to prevent content from hiding under banner
+      document.body.style.paddingTop = '80px';
+    });
+    
+    // Handle promotion from spectator to player
+    socket.on('promotedToPlayer', ({ message }) => {
+      console.log('Promoted to player:', message);
+      
+      // Remove spectator banner if it exists
+      const spectatorBanner = document.getElementById('spectatorBanner');
+      if (spectatorBanner) {
+        spectatorBanner.remove();
+        document.body.style.paddingTop = '0';
+      }
+      
+      // Show notification
+      const notification = document.createElement('div');
+      notification.classList.add('notification', 'success');
+      notification.textContent = message;
+      notification.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #4CAF50; color: white; padding: 1rem 2rem; border-radius: 8px; z-index: 10000; box-shadow: 0 4px 6px rgba(0,0,0,0.2);';
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        notification.style.transition = 'opacity 0.3s';
+        notification.style.opacity = '0';
+        setTimeout(() => notification.remove(), 300);
+      }, 3000);
     });
     
     // Create and insert host message

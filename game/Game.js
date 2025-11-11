@@ -137,6 +137,7 @@ class Game {
   constructor(roomCode) {
     this.roomCode = roomCode;
     this.players = [];
+    this.spectators = []; // Track spectators who join during active game
     this.deck = [];
     this.activeCards = [];
     this.currentPlayerIndex = 0;

@@ -67,7 +67,7 @@ io.on('connection', (socket) => {
   let currentRoomCode = null;
   
   // Join room
-  socket.on('joinRoom', ({ roomCode, nickname }) => {
+  socket.on('joinRoom', ({ roomCode, nickname, reconnectToken }) => {
     console.log(`Socket ${socket.id} attempting to join room: ${roomCode} with nickname: ${nickname}`);
     roomCode = roomCode.toUpperCase();
     
@@ -78,6 +78,62 @@ io.on('connection', (socket) => {
     }
     
     const game = activeGames[roomCode];
+    
+    // Check if this is a reconnection attempt
+    if (reconnectToken && game.isGameInProgress()) {
+      const existingPlayer = game.players.find(p => p.nickname === nickname);
+      if (existingPlayer) {
+        console.log(`Player ${nickname} reconnecting to room ${roomCode}`);
+        // Update the player's socket ID
+        existingPlayer.id = socket.id;
+        
+        // Store room code for disconnection handling
+        currentRoomCode = roomCode;
+        socket.join(roomCode);
+        
+        // Update room activity timestamp
+        updateRoomActivity(roomCode);
+        
+        // Send game state to reconnected player
+        socket.emit('reconnected', { 
+          playerId: socket.id,
+          message: 'Successfully reconnected to game!' 
+        });
+        
+        // Update all players
+        io.to(roomCode).emit('updatePlayers', {
+          players: game.getPlayers(),
+          canStart: game.canStart(),
+          hostId: game.getHostId()
+        });
+        
+        // Send current game state
+        updateGameState(roomCode);
+        return;
+      }
+    }
+    
+    // If game is in progress and this is not a reconnect, add as spectator
+    if (game.isGameInProgress()) {
+      console.log(`Game in progress, ${nickname} joining as spectator`);
+      currentRoomCode = roomCode;
+      socket.join(roomCode);
+      
+      // Add to spectators list
+      if (!game.spectators) game.spectators = [];
+      game.spectators.push({ id: socket.id, nickname });
+      
+      socket.emit('joinedAsSpectator', {
+        message: 'Game in progress. You will join the next game!',
+        currentPlayers: game.getPlayers()
+      });
+      
+      // Send current game state for viewing
+      updateGameState(roomCode);
+      return;
+    }
+    
+    // Normal join for games not in progress
     const player = game.addPlayer(socket.id, nickname);
     
     if (!player) {
@@ -286,7 +342,10 @@ io.on('connection', (socket) => {
     const playerIds = game.getPlayers().map(p => p.id);
     const playerNicknames = game.getPlayers().map(p => p.nickname);
     
-    console.log(`Creating new game in room ${roomCode} with players:`, playerNicknames);
+    // Add spectators to the new game if there's room
+    const spectators = game.spectators || [];
+    
+    console.log(`Creating new game in room ${roomCode} with players:`, playerNicknames, 'and spectators:', spectators.map(s => s.nickname));
     
     // Clear any existing timers before creating new game
     if (game.turnTimer) {
@@ -300,9 +359,23 @@ io.on('connection', (socket) => {
     activeGames[roomCode] = new Game(roomCode);
     const newGame = activeGames[roomCode];
     
-    // Add players back
+    // Add existing players back
     playerIds.forEach((id, index) => {
       newGame.addPlayer(id, playerNicknames[index]);
+    });
+    
+    // Add spectators as players if there's room (max 4 players)
+    spectators.forEach(spectator => {
+      if (newGame.players.length < 4) {
+        const added = newGame.addPlayer(spectator.id, spectator.nickname);
+        if (added) {
+          console.log(`Added spectator ${spectator.nickname} to new game`);
+          // Notify spectator they're now a player
+          io.to(spectator.id).emit('promotedToPlayer', {
+            message: 'You have been added to the new game!'
+          });
+        }
+      }
     });
     
     // Set the original host as the host for the new game
@@ -318,7 +391,7 @@ io.on('connection', (socket) => {
       hostId: newGame.getHostId()
     });
     
-    console.log(`New game created in room ${roomCode}, notified ${playerIds.length} players`);
+    console.log(`New game created in room ${roomCode}, notified ${newGame.players.length} players`);
   });
 
   // Handle event when host continues to next round
