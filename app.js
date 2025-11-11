@@ -150,12 +150,21 @@ io.on('connection', (socket) => {
     if (!game || game.currentPhase !== 'offering') return;
     if (game.getCurrentPlayerId() !== socket.id) return;
     
+    // Clear the existing timer before changing phase
+    if (game.turnTimer) {
+      clearTimeout(game.turnTimer);
+      game.turnTimer = null;
+    }
+    
     game.flipCard(cardIndex);
     updateGameState(roomCode);
     
     // Move to selection phase
     game.setPhase('selection');
     updateGameState(roomCode);
+    
+    // Start a new timer for the selection phase
+    startTurnTimer(roomCode);
   });
   
   // Receiving player selects which card to take
@@ -165,6 +174,12 @@ io.on('connection', (socket) => {
     
     if (!game || game.currentPhase !== 'selection') return;
     if (game.getReceivingPlayerId() !== socket.id) return;
+    
+    // Clear the existing timer before processing
+    if (game.turnTimer) {
+      clearTimeout(game.turnTimer);
+      game.turnTimer = null;
+    }
     
     game.selectCard(cardIndex);
     
@@ -234,11 +249,17 @@ io.on('connection', (socket) => {
         // Start a new round
         game.startNewRound();
         io.to(roomCode).emit('roundComplete', { gameRound: game.gameRound });
+        // Start timer for the new round
+        startTurnTimer(roomCode);
       }
       
-      // Clear any existing timer just in case
+      // Clear any existing timers just in case
       if (game.scoringTimer) {
         clearTimeout(game.scoringTimer);
+      }
+      if (game.turnTimer) {
+        clearTimeout(game.turnTimer);
+        game.turnTimer = null;
       }
       updateGameState(roomCode);
     }
@@ -266,6 +287,14 @@ io.on('connection', (socket) => {
     const playerNicknames = game.getPlayers().map(p => p.nickname);
     
     console.log(`Creating new game in room ${roomCode} with players:`, playerNicknames);
+    
+    // Clear any existing timers before creating new game
+    if (game.turnTimer) {
+      clearTimeout(game.turnTimer);
+    }
+    if (game.scoringTimer) {
+      clearTimeout(game.scoringTimer);
+    }
     
     // Create a new game with the same players
     activeGames[roomCode] = new Game(roomCode);
@@ -346,8 +375,15 @@ io.on('connection', (socket) => {
       if (game.isGameInProgress()) {
         // If it was the current player's turn, advance to next player
         if (game.getCurrentPlayerId() === socket.id) {
+          // Clear the timer and restart it for the next player
+          if (game.turnTimer) {
+            clearTimeout(game.turnTimer);
+            game.turnTimer = null;
+          }
           game.advanceTurn();
           updateGameState(currentRoomCode);
+          // Start timer for the new current player
+          startTurnTimer(currentRoomCode);
         }
       }
     }
@@ -422,54 +458,56 @@ function startTurnTimer(roomCode) {
   const game = activeGames[roomCode];
   if (!game) return;
   
-  // Clear any existing timer
+  // Clear any existing timer first
   if (game.turnTimer) {
     clearTimeout(game.turnTimer);
+    game.turnTimer = null;
+  }
+  
+  // Only start timer for offering or selection phases
+  if (game.currentPhase !== 'offering' && game.currentPhase !== 'selection') {
+    console.log('Not starting timer - phase is:', game.currentPhase);
+    return;
   }
   
   // Update room activity timestamp
   updateRoomActivity(roomCode);
   
+  console.log(`Starting turn timer for room ${roomCode}, phase: ${game.currentPhase}`);
+  
   // Set new timer (30 seconds)
   game.turnTimer = setTimeout(() => {
-    // Check if room still exists before proceeding
-    if (!activeGames[roomCode]) return;
+    console.log(`Turn time expired for room: ${roomCode}, phase: ${game.currentPhase}`);
     
-    console.log('Turn time expired for room:', roomCode);
+    // Verify game still exists and is in a valid state
+    if (!activeGames[roomCode]) {
+      console.log('Game no longer exists, timer cancelled');
+      return;
+    }
     
-    // Auto-complete the turn
-    if (game.currentPhase === 'offering') {
+    const currentGame = activeGames[roomCode];
+    
+    // Auto-complete the turn based on current phase
+    if (currentGame.currentPhase === 'offering') {
+      console.log('Auto-flipping card due to timeout');
       // If offering player hasn't chosen, randomly flip a card
-      game.randomFlip();
-      game.setPhase('selection');
+      currentGame.randomFlip();
+      currentGame.setPhase('selection');
       updateGameState(roomCode);
       
-      // Start another timer for selection phase
-      game.turnTimer = setTimeout(() => {
-        // If receiving player hasn't chosen, randomly select a card
-        game.randomSelect();
-        
-        // Advance to next turn or round
-        if (game.currentPhase === 'scoring') {
-          startTurnTimer(roomCode);
-        } else {
-          startTurnTimer(roomCode);
-        }
-        
-        updateGameState(roomCode);
-      }, 30000); // 30 seconds for selection
-    } else if (game.currentPhase === 'selection') {
-      // If receiving player hasn't chosen, randomly select a card
-      game.randomSelect();
+      // Recursively start a new timer for the selection phase
+      startTurnTimer(roomCode);
       
-      // Advance to next turn or round
-      if (game.currentPhase === 'scoring') {
-        startTurnTimer(roomCode);
-      } else {
+    } else if (currentGame.currentPhase === 'selection') {
+      console.log('Auto-selecting card due to timeout');
+      // If receiving player hasn't chosen, randomly select a card
+      currentGame.randomSelect();
+      updateGameState(roomCode);
+      
+      // Start timer for next turn if not in scoring phase
+      if (currentGame.currentPhase !== 'scoring') {
         startTurnTimer(roomCode);
       }
-      
-      updateGameState(roomCode);
     }
   }, 30000); // 30 seconds
 }
