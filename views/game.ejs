@@ -635,26 +635,13 @@
       // Auto-join room if nickname is provided
       if (nickname) {
         console.log('Auto-joining room with nickname:', nickname);
-        
-        // Try to get reconnect token from localStorage
-        const reconnectToken = localStorage.getItem(`tussie_${roomCode}_${nickname}`);
-        
-        if (reconnectToken) {
-          console.log('Found reconnect token, attempting to reconnect');
-          socket.emit('joinRoom', { roomCode, nickname, reconnectToken });
-        } else {
-          console.log('No reconnect token found, joining as new player');
-          socket.emit('joinRoom', { roomCode, nickname });
-        }
+        socket.emit('joinRoom', { roomCode, nickname });
       }
     });
     
     socket.on('updatePlayers', ({ players, canStart, hostId }) => {
       console.log('Received updatePlayers event. Players:', players, 'hostId:', hostId);
       updatePlayersList(players, hostId);
-      
-      // Store session info in localStorage for reconnection
-      localStorage.setItem(`tussie_${roomCode}_${nickname}`, socket.id);
       
       // Track if current player is host
       isHost = hostId === socket.id;
@@ -668,72 +655,6 @@
         const hostMessage = document.getElementById('hostMessage') || createHostMessage();
         hostMessage.style.display = isHost ? 'none' : 'block';
       }
-    });
-    
-    // Handle successful reconnection
-    socket.on('reconnected', ({ message }) => {
-      console.log('Reconnected successfully:', message);
-      
-      // Show notification
-      const notification = document.createElement('div');
-      notification.classList.add('notification', 'success');
-      notification.textContent = message;
-      notification.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #4CAF50; color: white; padding: 1rem 2rem; border-radius: 8px; z-index: 10000; box-shadow: 0 4px 6px rgba(0,0,0,0.2);';
-      document.body.appendChild(notification);
-      
-      setTimeout(() => {
-        notification.style.transition = 'opacity 0.3s';
-        notification.style.opacity = '0';
-        setTimeout(() => notification.remove(), 300);
-      }, 3000);
-    });
-    
-    // Handle joining as spectator
-    socket.on('joinedAsSpectator', ({ message }) => {
-      console.log('Joined as spectator:', message);
-      
-      // Hide start game button (spectators can't start games)
-      if (startGameBtn) {
-        startGameBtn.style.display = 'none';
-      }
-      
-      // Show spectator notification
-      const spectatorBanner = document.createElement('div');
-      spectatorBanner.id = 'spectatorBanner';
-      spectatorBanner.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem; text-align: center; z-index: 9999; box-shadow: 0 2px 8px rgba(0,0,0,0.2);';
-      spectatorBanner.innerHTML = `
-        <strong>👀 Spectating</strong><br>
-        <span style="font-size: 0.9em;">You're watching this game. You'll be able to join the next one!</span>
-      `;
-      document.body.insertBefore(spectatorBanner, document.body.firstChild);
-      
-      // Also add margin to body to prevent content from hiding under banner
-      document.body.style.paddingTop = '80px';
-    });
-    
-    // Handle promotion from spectator to player
-    socket.on('promotedToPlayer', ({ message }) => {
-      console.log('Promoted to player:', message);
-      
-      // Remove spectator banner if it exists
-      const spectatorBanner = document.getElementById('spectatorBanner');
-      if (spectatorBanner) {
-        spectatorBanner.remove();
-        document.body.style.paddingTop = '0';
-      }
-      
-      // Show notification
-      const notification = document.createElement('div');
-      notification.classList.add('notification', 'success');
-      notification.textContent = message;
-      notification.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #4CAF50; color: white; padding: 1rem 2rem; border-radius: 8px; z-index: 10000; box-shadow: 0 4px 6px rgba(0,0,0,0.2);';
-      document.body.appendChild(notification);
-      
-      setTimeout(() => {
-        notification.style.transition = 'opacity 0.3s';
-        notification.style.opacity = '0';
-        setTimeout(() => notification.remove(), 300);
-      }, 3000);
     });
     
     // Create and insert host message
@@ -765,6 +686,39 @@
     socket.on('gameReset', () => {
       console.log('Received gameReset event from server');
       resetGame();
+    });
+    
+    // Handle game ending due to disconnect
+    socket.on('gameEndedByDisconnect', ({ message, finalScores, players, canStart, hostId }) => {
+      console.log('Game ended by disconnect:', message, finalScores);
+      
+      // Show notification
+      const notification = document.createElement('div');
+      notification.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #ff9800; color: white; padding: 1rem 2rem; border-radius: 8px; z-index: 10000; box-shadow: 0 4px 6px rgba(0,0,0,0.2); text-align: center;';
+      notification.innerHTML = `<strong>${message}</strong>`;
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        notification.style.transition = 'opacity 0.3s';
+        notification.style.opacity = '0';
+        setTimeout(() => notification.remove(), 300);
+      }, 4000);
+      
+      // Reset game UI
+      resetGame();
+      
+      // Show final scores if available
+      if (finalScores && finalScores.length > 0) {
+        displayFinalScoresInWaiting(finalScores);
+      }
+      
+      // Update players list
+      updatePlayersList(players, hostId);
+      isHost = hostId === socket.id;
+      
+      if (startGameBtn) {
+        startGameBtn.disabled = !canStart || !isHost;
+      }
     });
     
     socket.on('error', (message) => {
@@ -1384,6 +1338,48 @@
       }
       
       console.log('Game reset complete');
+    }
+    
+    // Display final scores in waiting room
+    function displayFinalScoresInWaiting(finalScores) {
+      // Remove any existing scores display
+      const existingScores = document.getElementById('previousGameScores');
+      if (existingScores) {
+        existingScores.remove();
+      }
+      
+      // Sort scores by total score (descending)
+      const sortedScores = [...finalScores].sort((a, b) => b.totalScore - a.totalScore);
+      
+      // Create scores display
+      const scoresContainer = document.createElement('div');
+      scoresContainer.id = 'previousGameScores';
+      scoresContainer.style.cssText = 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.5rem; border-radius: 12px; margin: 1rem 0; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+      
+      const title = document.createElement('h3');
+      title.textContent = '🏆 Previous Game Results';
+      title.style.cssText = 'margin: 0 0 1rem 0; text-align: center; font-size: 1.3rem;';
+      scoresContainer.appendChild(title);
+      
+      sortedScores.forEach((player, index) => {
+        const playerDiv = document.createElement('div');
+        playerDiv.style.cssText = 'background: rgba(255,255,255,0.15); padding: 0.75rem; margin: 0.5rem 0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;';
+        
+        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+        
+        playerDiv.innerHTML = `
+          <span style="font-weight: bold; font-size: 1.1rem;">${medal} ${player.nickname}</span>
+          <span style="font-size: 1.2rem; font-weight: bold;">${player.totalScore} pts</span>
+        `;
+        
+        scoresContainer.appendChild(playerDiv);
+      });
+      
+      // Insert after players list
+      const playersList = document.getElementById('playersList');
+      if (playersList && playersList.parentNode) {
+        playersList.parentNode.insertBefore(scoresContainer, playersList.nextSibling);
+      }
     }
     
     function createCardElement(card, isOpponent = false, isVisible = true) {

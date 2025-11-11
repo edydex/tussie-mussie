@@ -67,7 +67,7 @@ io.on('connection', (socket) => {
   let currentRoomCode = null;
   
   // Join room
-  socket.on('joinRoom', ({ roomCode, nickname, reconnectToken }) => {
+  socket.on('joinRoom', ({ roomCode, nickname }) => {
     console.log(`Socket ${socket.id} attempting to join room: ${roomCode} with nickname: ${nickname}`);
     roomCode = roomCode.toUpperCase();
     
@@ -79,57 +79,9 @@ io.on('connection', (socket) => {
     
     const game = activeGames[roomCode];
     
-    // Check if this is a reconnection attempt
-    if (reconnectToken && game.isGameInProgress()) {
-      const existingPlayer = game.players.find(p => p.nickname === nickname);
-      if (existingPlayer) {
-        console.log(`Player ${nickname} reconnecting to room ${roomCode}`);
-        // Update the player's socket ID
-        existingPlayer.id = socket.id;
-        
-        // Store room code for disconnection handling
-        currentRoomCode = roomCode;
-        socket.join(roomCode);
-        
-        // Update room activity timestamp
-        updateRoomActivity(roomCode);
-        
-        // Send game state to reconnected player
-        socket.emit('reconnected', { 
-          playerId: socket.id,
-          message: 'Successfully reconnected to game!' 
-        });
-        
-        // Update all players
-        io.to(roomCode).emit('updatePlayers', {
-          players: game.getPlayers(),
-          canStart: game.canStart(),
-          hostId: game.getHostId()
-        });
-        
-        // Send current game state
-        updateGameState(roomCode);
-        return;
-      }
-    }
-    
-    // If game is in progress and this is not a reconnect, add as spectator
+    // If game is in progress, don't allow joining
     if (game.isGameInProgress()) {
-      console.log(`Game in progress, ${nickname} joining as spectator`);
-      currentRoomCode = roomCode;
-      socket.join(roomCode);
-      
-      // Add to spectators list
-      if (!game.spectators) game.spectators = [];
-      game.spectators.push({ id: socket.id, nickname });
-      
-      socket.emit('joinedAsSpectator', {
-        message: 'Game in progress. You will join the next game!',
-        currentPlayers: game.getPlayers()
-      });
-      
-      // Send current game state for viewing
-      updateGameState(roomCode);
+      socket.emit('error', 'Game is in progress. Please wait for it to finish.');
       return;
     }
     
@@ -342,10 +294,7 @@ io.on('connection', (socket) => {
     const playerIds = game.getPlayers().map(p => p.id);
     const playerNicknames = game.getPlayers().map(p => p.nickname);
     
-    // Add spectators to the new game if there's room
-    const spectators = game.spectators || [];
-    
-    console.log(`Creating new game in room ${roomCode} with players:`, playerNicknames, 'and spectators:', spectators.map(s => s.nickname));
+    console.log(`Creating new game in room ${roomCode} with players:`, playerNicknames);
     
     // Clear any existing timers before creating new game
     if (game.turnTimer) {
@@ -362,20 +311,6 @@ io.on('connection', (socket) => {
     // Add existing players back
     playerIds.forEach((id, index) => {
       newGame.addPlayer(id, playerNicknames[index]);
-    });
-    
-    // Add spectators as players if there's room (max 4 players)
-    spectators.forEach(spectator => {
-      if (newGame.players.length < 4) {
-        const added = newGame.addPlayer(spectator.id, spectator.nickname);
-        if (added) {
-          console.log(`Added spectator ${spectator.nickname} to new game`);
-          // Notify spectator they're now a player
-          io.to(spectator.id).emit('promotedToPlayer', {
-            message: 'You have been added to the new game!'
-          });
-        }
-      }
     });
     
     // Set the original host as the host for the new game
@@ -444,20 +379,48 @@ io.on('connection', (socket) => {
         previousHostId: wasHost ? socket.id : null
       });
       
-      // If game was in progress, handle accordingly
+      // If game was in progress, end it and send everyone back to waiting room
       if (game.isGameInProgress()) {
-        // If it was the current player's turn, advance to next player
-        if (game.getCurrentPlayerId() === socket.id) {
-          // Clear the timer and restart it for the next player
-          if (game.turnTimer) {
-            clearTimeout(game.turnTimer);
-            game.turnTimer = null;
-          }
-          game.advanceTurn();
-          updateGameState(currentRoomCode);
-          // Start timer for the new current player
-          startTurnTimer(currentRoomCode);
+        console.log(`Player disconnected during active game. Ending game in room ${currentRoomCode}`);
+        
+        // Clear any timers
+        if (game.turnTimer) {
+          clearTimeout(game.turnTimer);
+          game.turnTimer = null;
         }
+        if (game.scoringTimer) {
+          clearTimeout(game.scoringTimer);
+          game.scoringTimer = null;
+        }
+        
+        // Get final scores before resetting
+        const finalScores = game.getPlayers().map(player => ({
+          nickname: player.nickname,
+          totalScore: player.totalScore,
+          roundScores: player.roundScores || []
+        }));
+        
+        // Reset game to waiting state
+        game.currentPhase = 'waiting';
+        game.round = 0;
+        game.gameRound = 1;
+        game.turnCount = 0;
+        
+        // Reset players but keep them in the room
+        game.getPlayers().forEach(player => {
+          player.cards = [];
+          player.score = 0;
+          player.doneScoring = false;
+        });
+        
+        // Notify all players that game ended and show scores
+        io.to(currentRoomCode).emit('gameEndedByDisconnect', {
+          message: 'A player left the game. Returning to waiting room.',
+          finalScores: finalScores,
+          players: game.getPlayers(),
+          canStart: game.canStart(),
+          hostId: game.getHostId()
+        });
       }
     }
   });
