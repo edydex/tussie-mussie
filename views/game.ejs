@@ -2024,9 +2024,6 @@
       
       // Touch events for mobile
       cardElement.addEventListener('touchstart', (e) => {
-        // Prevent text selection immediately
-        e.preventDefault();
-        
         longPressTriggered = false;
         longPressTarget = cardElement;
         
@@ -2034,7 +2031,7 @@
           longPressTriggered = true;
           showCardPreview(cardId, cardName);
         }, 350); // 350ms long press - faster response
-      }, { passive: false });
+      }, { passive: true });
       
       cardElement.addEventListener('touchend', (e) => {
         if (longPressTimer) {
