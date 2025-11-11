@@ -77,6 +77,61 @@
       height: 55px; /* Smaller area for opponent keepsakes */
     }
     
+    /* Mobile responsive overrides for card layout */
+    @media (max-width: 768px) {
+      .player-cards-container {
+        padding: 0.5rem;
+        min-height: 180px; /* Space for keepsake offset */
+        margin-bottom: 0.5rem;
+      }
+      
+      .opponent-cards-container {
+        padding: 0.5rem;
+        min-height: 150px; /* Space for keepsake offset */
+        margin-bottom: 0.5rem;
+      }
+      
+      .player-cards,
+      .opponent-cards {
+        gap: 0.35rem;
+        padding: 0.25rem;
+        flex-wrap: nowrap;
+        overflow-x: visible; /* No scroll within card area */
+        -webkit-overflow-scrolling: touch;
+      }
+      
+      /* KEEP keepsake offset - it's crucial game logic! */
+      .card.keepsake-card {
+        top: 25px; /* Keep the offset */
+      }
+      
+      .opponent-card.keepsake-card {
+        top: 18px; /* Keep the offset for opponents */
+      }
+      
+      /* Hide the gray background area - labels are enough */
+      .keepsakes-area {
+        display: none;
+      }
+      
+      .opponent .keepsakes-area {
+        display: none;
+      }
+      
+      .card-label {
+        font-size: 0.6rem;
+        padding: 1px 4px;
+        top: -8px;
+      }
+    }
+    
+    @media (max-width: 400px) {
+      .player-cards,
+      .opponent-cards {
+        gap: 0.3rem;
+      }
+    }
+    
     /* Turn Timer Styles */
     .turn-timer {
       position: fixed;
@@ -316,6 +371,102 @@
       background-color: #fffde7;
       border-left: 3px solid #ffd700;
     }
+    
+    /* Card Preview Modal Styles */
+    .card-preview-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.85);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+      animation: fadeIn 0.2s ease-in;
+    }
+    
+    .card-preview-modal.visible {
+      display: flex;
+    }
+    
+    .card-preview-content {
+      background: white;
+      padding: 1rem;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      max-width: 90vw;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    .card-preview-image {
+      max-width: 100%;
+      max-height: 70vh;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+    
+    .card-preview-info {
+      margin-top: 1rem;
+      text-align: center;
+    }
+    
+    .card-preview-name {
+      font-size: 1.5rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+      color: var(--primary-color);
+    }
+    
+    .card-preview-close {
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+    
+    /* Card long-press hint */
+    .card.can-preview {
+      cursor: pointer;
+      position: relative;
+    }
+    
+    .card.can-preview::after {
+      content: "👁️";
+      position: absolute;
+      bottom: 4px;
+      right: 4px;
+      font-size: 0.8rem;
+      opacity: 0.4;
+      pointer-events: none;
+    }
+    
+    .card.can-preview:active {
+      transform: scale(0.98);
+    }
+    
+    @media (max-width: 768px) {
+      .card.can-preview::after {
+        font-size: 0.7rem;
+      }
+    }
   </style>
 </head>
 <body>
@@ -395,6 +546,17 @@
     </main>
   </div>
   
+  <!-- Card Preview Modal -->
+  <div id="cardPreviewModal" class="card-preview-modal">
+    <div class="card-preview-content">
+      <img id="cardPreviewImage" class="card-preview-image" src="" alt="Card Preview">
+      <div class="card-preview-info">
+        <div id="cardPreviewName" class="card-preview-name"></div>
+      </div>
+      <button id="cardPreviewClose" class="card-preview-close">Close</button>
+    </div>
+  </div>
+  
   <script>
     // Simplified room joining mechanism - initialize socket first
     const socket = io();
@@ -410,6 +572,51 @@
     let snapdragonMovesUsed = 0;  // Track how many Snapdragon moves have been used
     let marigoldAbilityInProgress = false;
     let cardPositions = new Map(); // Store card positions for consistent rendering
+    
+    // Card sprite mapping - maps card IDs to their position in the spritesheet
+    // Spritesheet layout: 7 columns × 4 rows, left to right, top to bottom
+    const cardSpriteMap = {
+      // Row 0: Red Rose, Camellia, Red Tulip, Amaryllis, Orchid, Gardenia, Daisy
+      'red-rose': { row: 0, col: 0 },
+      'camellia': { row: 0, col: 1 },
+      'red-tulip': { row: 0, col: 2 },
+      'amaryllis': { row: 0, col: 3 },
+      'orchid': { row: 0, col: 4 },
+      'gardenia': { row: 0, col: 5 },
+      'daisy': { row: 0, col: 6 },
+      
+      // Row 1: Peony, Phlox, Pink Rose, Pink Larkspur, Carnation, Honeysuckle, Marigold
+      'peony': { row: 1, col: 0 },
+      'phlox': { row: 1, col: 1 },
+      'pink-rose': { row: 1, col: 2 },
+      'pink-larkspur': { row: 1, col: 3 },
+      'carnation': { row: 1, col: 4 },
+      'honeysuckle': { row: 1, col: 5 },
+      'marigold': { row: 1, col: 6 },
+      
+      // Row 2: Hyacinth, Snapdragon, Forget-Me-Not, Violet, Ivy, Wormwood, Fern
+      'hyacinth': { row: 2, col: 0 },
+      'snapdragon': { row: 2, col: 1 },
+      'forget-me-not': { row: 2, col: 2 },
+      'violet': { row: 2, col: 3 },
+      'ivy': { row: 2, col: 4 },           // Expansion card
+      'wormwood': { row: 2, col: 5 },      // Expansion card
+      'fern': { row: 2, col: 6 },          // Expansion card
+      
+      // Row 3: Eucalyptus, Bay Laurel, Nasturtium, Daylily, Butterfly Weed, Trumpet Vine, Card Back
+      'eucalyptus': { row: 3, col: 0 },    // Expansion card
+      'bay-laurel': { row: 3, col: 1 },    // Expansion card
+      'nasturtium': { row: 3, col: 2 },    // Expansion card
+      'daylily': { row: 3, col: 3 },       // Expansion card
+      'butterfly-weed': { row: 3, col: 4 }, // Expansion card
+      'trumpet-vine': { row: 3, col: 5 },  // Expansion card
+      'card-back': { row: 3, col: 6 }      // Card back design
+    };
+    
+    // Long press timer
+    let longPressTimer = null;
+    let longPressTarget = null;
+    let longPressTriggered = false;  // Track if long press was triggered to prevent click
     
     // DOM Elements
     const playersList = document.getElementById('playersList');
@@ -1189,6 +1396,11 @@
         cardElement.classList.add('opponent-card');
       }
       
+      // Set up long-press for face-up cards
+      if (card.faceUp && card.id) {
+        setupCardLongPress(cardElement, card.id, card.name);
+      }
+      
       return cardElement;
     }
     
@@ -1676,6 +1888,167 @@
         transitionOverlay.style.display = 'none';
       }
     });
+    
+    // Card Preview Modal Functions
+    const cardPreviewModal = document.getElementById('cardPreviewModal');
+    const cardPreviewImage = document.getElementById('cardPreviewImage');
+    const cardPreviewName = document.getElementById('cardPreviewName');
+    const cardPreviewClose = document.getElementById('cardPreviewClose');
+    
+    function showCardPreview(cardId, cardName) {
+      if (!cardSpriteMap[cardId]) {
+        console.warn('No sprite mapping for card:', cardId);
+        return;
+      }
+      
+      const sprite = cardSpriteMap[cardId];
+      
+      // Create a canvas to extract the specific card from the spritesheet
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      // Spritesheet layout: 7 columns × 4 rows, evenly distributed
+      // We'll calculate exact dimensions when the image loads
+      const COLS = 7;
+      const ROWS = 4;
+      
+      // Load the spritesheet
+      const img = new Image();
+      img.onload = function() {
+        // Calculate card dimensions based on actual image size
+        const CARD_WIDTH = img.width / COLS;
+        const CARD_HEIGHT = img.height / ROWS;
+        
+        // Set canvas to card size
+        canvas.width = CARD_WIDTH;
+        canvas.height = CARD_HEIGHT;
+        
+        // Calculate position in spritesheet
+        const sx = sprite.col * CARD_WIDTH;
+        const sy = sprite.row * CARD_HEIGHT;
+        
+        // Draw the specific card onto the canvas
+        ctx.drawImage(
+          img,
+          sx, sy, CARD_WIDTH, CARD_HEIGHT,  // Source rectangle from spritesheet
+          0, 0, CARD_WIDTH, CARD_HEIGHT      // Destination rectangle on canvas
+        );
+        
+        // Convert canvas to data URL and display
+        cardPreviewImage.src = canvas.toDataURL();
+        cardPreviewName.textContent = cardName;
+        cardPreviewModal.classList.add('visible');
+      };
+      
+      img.src = '/images/tussie_mussie.png';
+    }
+    
+    function hideCardPreview() {
+      cardPreviewModal.classList.remove('visible');
+    }
+    
+    // Close modal on button click
+    cardPreviewClose.addEventListener('click', hideCardPreview);
+    
+    // Close modal on background click
+    cardPreviewModal.addEventListener('click', (e) => {
+      if (e.target === cardPreviewModal) {
+        hideCardPreview();
+      }
+    });
+    
+    // Handle long press on cards
+    function setupCardLongPress(cardElement, cardId, cardName) {
+      if (!cardId || cardId === 'back') return; // Don't set up for card backs
+      
+      cardElement.classList.add('can-preview');
+      
+      // Touch events for mobile
+      cardElement.addEventListener('touchstart', (e) => {
+        longPressTriggered = false;
+        longPressTarget = cardElement;
+        longPressTimer = setTimeout(() => {
+          longPressTriggered = true;
+          showCardPreview(cardId, cardName);
+          // Prevent default to avoid context menu
+          e.preventDefault();
+        }, 500); // 500ms long press
+      }, { passive: false });
+      
+      cardElement.addEventListener('touchend', (e) => {
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+        
+        // If long press was triggered, prevent the click/tap from propagating
+        if (longPressTriggered) {
+          e.preventDefault();
+          e.stopPropagation();
+          longPressTriggered = false;
+        }
+        
+        longPressTarget = null;
+      });
+      
+      cardElement.addEventListener('touchmove', () => {
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+        longPressTriggered = false;
+      });
+      
+      // Mouse events for desktop
+      cardElement.addEventListener('mousedown', (e) => {
+        // Right click shows preview immediately
+        if (e.button === 2) {
+          e.preventDefault();
+          longPressTriggered = true;
+          showCardPreview(cardId, cardName);
+          return;
+        }
+        
+        longPressTriggered = false;
+        longPressTarget = cardElement;
+        longPressTimer = setTimeout(() => {
+          longPressTriggered = true;
+          showCardPreview(cardId, cardName);
+        }, 500); // 500ms long press
+      });
+      
+      cardElement.addEventListener('mouseup', () => {
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+        longPressTarget = null;
+      });
+      
+      cardElement.addEventListener('mouseleave', () => {
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+        longPressTriggered = false;
+        longPressTarget = null;
+      });
+      
+      // Prevent the click event if long press was triggered
+      cardElement.addEventListener('click', (e) => {
+        if (longPressTriggered) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          longPressTriggered = false;
+        }
+      }, true); // Use capture phase to catch it early
+      
+      // Prevent context menu on right click
+      cardElement.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+      });
+    }
   </script>
 </body>
 </html>

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Spritesheet Test</title>
+  <style>
+    body {
+      margin: 20px;
+      font-family: Arial, sans-serif;
+    }
+    #info {
+      margin-bottom: 20px;
+      padding: 10px;
+      background: #f0f0f0;
+    }
+    canvas {
+      border: 2px solid #333;
+      cursor: crosshair;
+    }
+    #preview {
+      margin-top: 20px;
+      border: 2px solid #666;
+      background: white;
+    }
+  </style>
+</head>
+<body>
+  <h1>Tussie Mussie Spritesheet Inspector</h1>
+  <div id="info">
+    <div>Image dimensions: <span id="dimensions">Loading...</span></div>
+    <div>Mouse position: <span id="mousePos">-</span></div>
+    <div>Click to mark card boundaries</div>
+  </div>
+  
+  <canvas id="canvas"></canvas>
+  
+  <h3>Preview Area</h3>
+  <canvas id="preview" width="300" height="400"></canvas>
+  
+  <script>
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      // Set canvas to image size (scaled down if too large)
+      const scale = Math.min(1, 1200 / img.width);
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      
+      document.getElementById('dimensions').textContent = 
+        `${img.width} x ${img.height} (displayed at ${Math.round(scale * 100)}%)`;
+      
+      // Track mouse position
+      canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = Math.round((e.clientX - rect.left) / scale);
+        const y = Math.round((e.clientY - rect.top) / scale);
+        document.getElementById('mousePos').textContent = `X: ${x}, Y: ${y}`;
+      });
+      
+      // Click to extract card preview
+      canvas.addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = Math.round((e.clientX - rect.left) / scale);
+        const y = Math.round((e.clientY - rect.top) / scale);
+        
+        // Estimate card size and extract
+        const cardWidth = 400;  // Adjust these values based on actual card size
+        const cardHeight = 560;
+        
+        const previewCanvas = document.getElementById('preview');
+        const previewCtx = previewCanvas.getContext('2d');
+        
+        previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+        previewCtx.drawImage(
+          img,
+          x, y, cardWidth, cardHeight,
+          0, 0, previewCanvas.width, previewCanvas.height
+        );
+        
+        console.log(`Card region: x=${x}, y=${y}, w=${cardWidth}, h=${cardHeight}`);
+      });
+    };
+    
+    img.src = '/images/tussie_mussie.png';
+  </script>
+</body>
+</html>

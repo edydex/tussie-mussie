@@ -639,13 +639,159 @@ input[type="text"] {
     grid-template-columns: 1fr;
   }
   
+  .container {
+    padding: 0.5rem;
+  }
+  
+  header h1 {
+    font-size: 1.8rem;
+    margin-bottom: 0.25rem;
+  }
+  
+  /* Cards during play phase - sized to fit 4 cards on mobile */
   .card {
-    width: 120px;
-    height: 180px;
+    width: 88px;
+    height: 126px;
+    min-width: 88px;
+    flex-shrink: 0;
+    font-size: 0.65rem;
+    padding: 0.3rem;
+  }
+  
+  .card-header {
+    margin-bottom: 0.25rem;
+  }
+  
+  .card-name {
+    font-size: 0.65rem;
+    line-height: 1.1;
+  }
+  
+  .card-effect {
+    padding: 0.25rem;
+    font-size: 0.6rem;
+    margin-bottom: 0.25rem;
+    line-height: 1.15;
+  }
+  
+  .card-flavor {
+    font-size: 0.6rem;
+    padding: 0.25rem;
+    line-height: 1.15;
+  }
+  
+  .card-hearts {
+    font-size: 0.7rem;
+  }
+  
+  /* KEEP keepsake offset - crucial game mechanic! */
+  .card.keepsake-card {
+    top: 25px;
   }
   
   .opponent-card {
+    width: 72px;
+    height: 103px;
+    min-width: 72px;
+    flex-shrink: 0;
+    font-size: 0.55rem;
+  }
+  
+  .opponent-card.keepsake-card {
+    top: 18px;
+  }
+  
+  .active-cards-area {
+    gap: 0.5rem;
+    min-height: auto;
+    padding: 0.5rem;
+  }
+  
+  /* Scoring phase - smaller cards to fit without scrolling */
+  .game-section {
+    padding: 0.5rem;
+  }
+  
+  .scoring-section .card {
     width: 80px;
-    height: 120px;
+    height: 115px;
+    min-width: 80px;
+    font-size: 0.6rem;
+    padding: 0.25rem;
+  }
+  
+  .scoring-section .card-name {
+    font-size: 0.6rem;
+  }
+  
+  .scoring-section .card-effect {
+    padding: 0.2rem;
+    font-size: 0.55rem;
+    margin-bottom: 0.2rem;
+    line-height: 1.1;
+  }
+  
+  .scoring-section .card-flavor {
+    font-size: 0.55rem;
+    padding: 0.2rem;
+    line-height: 1.1;
+  }
+  
+  .ability-cards {
+    gap: 0.3rem;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .ability-card {
+    width: 80px;
+    height: 115px;
+    min-width: 80px;
+    flex-shrink: 0;
+    font-size: 0.6rem;
+  }
+  
+  .game-status {
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+  }
+}
+
+/* Extra small screens - slightly smaller */
+@media (max-width: 400px) {
+  .card {
+    width: 82px;
+    height: 117px;
+    min-width: 82px;
+    font-size: 0.62rem;
+  }
+  
+  .card.keepsake-card {
+    top: 22px;
+  }
+  
+  .opponent-card {
+    width: 68px;
+    height: 97px;
+    min-width: 68px;
+  }
+  
+  .opponent-card.keepsake-card {
+    top: 16px;
+  }
+  
+  .scoring-section .card,
+  .ability-card {
+    width: 75px;
+    height: 107px;
+    min-width: 75px;
+    font-size: 0.58rem;
+  }
+  
+  .player-cards,
+  .opponent-cards {
+    gap: 0.3rem;
   }
 }
