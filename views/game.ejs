@@ -2026,11 +2026,14 @@
       cardElement.addEventListener('touchstart', (e) => {
         longPressTriggered = false;
         longPressTarget = cardElement;
+        
+        // Temporarily disable text selection on this element
+        cardElement.style.webkitUserSelect = 'none';
+        cardElement.style.userSelect = 'none';
+        
         longPressTimer = setTimeout(() => {
           longPressTriggered = true;
           showCardPreview(cardId, cardName);
-          // Prevent default to avoid context menu
-          e.preventDefault();
         }, 500); // 500ms long press
       }, { passive: false });
       
@@ -2039,6 +2042,10 @@
           clearTimeout(longPressTimer);
           longPressTimer = null;
         }
+        
+        // Re-enable text selection
+        cardElement.style.webkitUserSelect = '';
+        cardElement.style.userSelect = '';
         
         // If long press was triggered, prevent the click/tap from propagating
         if (longPressTriggered) {
@@ -2055,6 +2062,9 @@
           clearTimeout(longPressTimer);
           longPressTimer = null;
         }
+        // Re-enable text selection since user is moving
+        cardElement.style.webkitUserSelect = '';
+        cardElement.style.userSelect = '';
         longPressTriggered = false;
       });
       

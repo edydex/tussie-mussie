@@ -362,22 +362,9 @@ input[type="text"] {
   transition: transform 0.2s, box-shadow 0.2s;
   background-color: #f8f8f8;
   position: relative;
-  /* Prevent text selection on mobile */
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
+  /* Allow touch manipulation but no callout */
   -webkit-touch-callout: none;
   touch-action: manipulation;
-}
-
-/* Prevent text selection on all card children */
-.card * {
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
 }
 
 .card.selectable {
@@ -433,19 +420,11 @@ input[type="text"] {
   font-weight: 600;
   font-size: 0.9rem;
   text-transform: uppercase;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
 }
 
 .card-hearts {
   display: flex;
   gap: 2px;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
 }
 
 .card-effect {
@@ -455,10 +434,6 @@ input[type="text"] {
   margin-bottom: 0.5rem;
   border-radius: 4px;
   font-size: 0.8rem;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
 }
 
 .card-flavor {
@@ -467,10 +442,6 @@ input[type="text"] {
   color: #666;
   text-align: center;
   padding: 0.5rem;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
 }
 
 /* Card colors */
