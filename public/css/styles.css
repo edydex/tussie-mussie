@@ -86,8 +86,14 @@ header h1 {
 }
 
 .btn:disabled {
-  background-color: #ccc;
+  background-color: #555;
   cursor: not-allowed;
+  transform: none;
+  color: #999;
+}
+
+.btn:disabled:hover {
+  background-color: #555;
   transform: none;
 }
 
@@ -98,6 +104,15 @@ header h1 {
 
 .primary-btn:hover {
   background-color: var(--secondary-color);
+}
+
+.primary-btn:disabled {
+  background-color: #555;
+  color: #999;
+}
+
+.primary-btn:disabled:hover {
+  background-color: #555;
 }
 
 .small-btn {
@@ -356,6 +371,15 @@ input[type="text"] {
   touch-action: manipulation;
 }
 
+/* Prevent text selection on all card children */
+.card * {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
 .card.selectable {
   cursor: pointer;
 }
@@ -409,11 +433,19 @@ input[type="text"] {
   font-weight: 600;
   font-size: 0.9rem;
   text-transform: uppercase;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 .card-hearts {
   display: flex;
   gap: 2px;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 .card-effect {
@@ -423,6 +455,10 @@ input[type="text"] {
   margin-bottom: 0.5rem;
   border-radius: 4px;
   font-size: 0.8rem;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 .card-flavor {
@@ -431,6 +467,10 @@ input[type="text"] {
   color: #666;
   text-align: center;
   padding: 0.5rem;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 /* Card colors */
@@ -717,14 +757,22 @@ input[type="text"] {
   /* Scoring phase - smaller cards to fit without scrolling */
   .game-section {
     padding: 0.5rem;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
   
   .scoring-section .card {
-    width: 72px;
-    height: 103px;
-    min-width: 72px;
-    font-size: 0.55rem;
+    width: 65px;
+    height: 93px;
+    min-width: 65px;
+    font-size: 0.5rem;
     padding: 0.2rem;
+  }
+  
+  .scoring-section .player-cards,
+  .scoring-section .opponent-cards {
+    gap: 0.25rem;
+    overflow-x: hidden;
   }
   
   .scoring-section .card-name {
@@ -791,11 +839,16 @@ input[type="text"] {
   
   .scoring-section .card,
   .ability-card {
-    width: 68px;
-    height: 97px;
-    min-width: 68px;
-    font-size: 0.52rem;
+    width: 62px;
+    height: 89px;
+    min-width: 62px;
+    font-size: 0.48rem;
     padding: 0.15rem;
+  }
+  
+  .scoring-section .player-cards,
+  .scoring-section .opponent-cards {
+    gap: 0.2rem;
   }
   
   .player-cards,
