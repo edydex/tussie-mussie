@@ -2034,7 +2034,7 @@
         longPressTimer = setTimeout(() => {
           longPressTriggered = true;
           showCardPreview(cardId, cardName);
-        }, 500); // 500ms long press
+        }, 350); // 350ms long press - faster response
       }, { passive: false });
       
       cardElement.addEventListener('touchend', (e) => {
@@ -2083,7 +2083,7 @@
         longPressTimer = setTimeout(() => {
           longPressTriggered = true;
           showCardPreview(cardId, cardName);
-        }, 500); // 500ms long press
+        }, 350); // 350ms long press - faster response
       });
       
       cardElement.addEventListener('mouseup', () => {

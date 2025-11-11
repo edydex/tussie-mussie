@@ -785,13 +785,66 @@ input[type="text"] {
   }
 }
 
-/* Extra small screens - slightly smaller */
-@media (max-width: 400px) {
+/* Small phones like Pixel 6a */
+@media (max-width: 420px) {
   .card {
-    width: 82px;
-    height: 117px;
-    min-width: 82px;
-    font-size: 0.62rem;
+    width: 78px;
+    height: 111px;
+    min-width: 78px;
+    font-size: 0.6rem;
+  }
+  
+  .card.keepsake-card {
+    top: 23px;
+  }
+  
+  .opponent-card {
+    width: 70px;
+    height: 100px;
+    min-width: 70px;
+  }
+  
+  .opponent-card.keepsake-card {
+    top: 18px;
+  }
+  
+  .scoring-section .card,
+  .ability-card {
+    width: 58px;
+    height: 83px;
+    min-width: 58px;
+    font-size: 0.45rem;
+    padding: 0.15rem;
+  }
+  
+  .scoring-section .card-name {
+    font-size: 0.5rem;
+  }
+  
+  .scoring-section .card-effect,
+  .scoring-section .card-flavor {
+    font-size: 0.45rem;
+    line-height: 1.05;
+  }
+  
+  .scoring-section .player-cards,
+  .scoring-section .opponent-cards {
+    gap: 0.18rem;
+  }
+  
+  .player-cards,
+  .opponent-cards {
+    gap: 0.28rem;
+  }
+}
+
+/* Extra small screens - even smaller */
+@media (max-width: 380px) {
+  .card {
+    width: 75px;
+    height: 107px;
+    min-width: 75px;
+    font-size: 0.58rem;
   }
   
   .card.keepsake-card {
@@ -810,20 +863,30 @@ input[type="text"] {
   
   .scoring-section .card,
   .ability-card {
-    width: 62px;
-    height: 89px;
-    min-width: 62px;
+    width: 56px;
+    height: 80px;
+    min-width: 56px;
+    font-size: 0.42rem;
+    padding: 0.12rem;
+  }
+  
+  .scoring-section .card-name {
     font-size: 0.48rem;
-    padding: 0.15rem;
+  }
+  
+  .scoring-section .card-effect,
+  .scoring-section .card-flavor {
+    font-size: 0.42rem;
+    line-height: 1.0;
   }
   
   .scoring-section .player-cards,
   .scoring-section .opponent-cards {
-    gap: 0.2rem;
+    gap: 0.15rem;
   }
   
   .player-cards,
   .opponent-cards {
-    gap: 0.3rem;
+    gap: 0.25rem;
   }
 }
